@@ -926,3 +926,44 @@ pnpm build: PASSED — dist/ produced, 2127 modules transformed
 ---
 
 USER: append to chat history
+
+(appended — see entry below)
+
+================================================================================
+TURN — TASK 7 (Claude Sonnet 4.6 via Claude Code CLI)
+Date: 2026-04-21
+================================================================================
+
+USER: Move to task 7. Include possible explanations for choices as well as explanation for architectural choices too.
+
+A: Surveyed full project state (all src/ files, package.json, manifest.json, vite.config.ts). Wrote three deliverables:
+
+README.md:
+- One-paragraph pitch
+- Features list (parallel LLM, Flesch-Kincaid hybrid, Zod validation, 10-min cache, typed error codes, shadcn-only)
+- Prerequisites, setup steps (pnpm install → cp .env.example → pnpm build → Load unpacked)
+- Dev HMR instructions
+- Scripts table (dev / build / typecheck)
+
+NOTES.md:
+- Mermaid data-flow diagram (reused from CLAUDE.md)
+- Architectural decisions with explicit rationale:
+  * LangGraph fan-out/fan-in: parallel = latency ~= slowest node, not sum of 5
+  * Hybrid readability: local FK grade anchors LLM score ±10, clamp prevents hallucinated metrics
+  * Self-contained extractor: executeScript serializes func as string — imports break at runtime
+  * Typed discriminated unions: compile-time exhaustiveness on both sides of the message channel
+  * Zod at both trust boundaries: DOM output + LLM output are untrusted; typed failures > crashes
+  * API key baked at build time: acceptable for personal tool; proxy needed for distribution
+  * shadcn-only: no specificity wars, consistent theme
+- Production concerns: API key exposure, PII/privacy, restricted origins, SPA lazy content, large pages, retries, cache key correctness, cost controls, i18n, missing tests
+- "Another week" list: proxy backend, streaming, diff view, per-category drill-down, MutationObserver, export, LangSmith, automated tests, chunked analysis
+- AI tools used → link to AI_CHAT_HISTORY/
+
+AI_CHAT_HISTORY/strada-build-claude-opus.md:
+- Copied from chat-history.txt
+
+---
+
+USER: append to chat history.
+
+A: Appended Task 7 session to chat-history.txt (this file).
