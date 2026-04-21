@@ -25,7 +25,9 @@ interface CacheEntry {
   timestamp: number
 }
 
-async function getCached(key: string): Promise<{ report: AnalysisReport; extracted: ExtractedCopy } | null> {
+async function getCached(
+  key: string,
+): Promise<{ report: AnalysisReport; extracted: ExtractedCopy } | null> {
   const result = await chrome.storage.local.get(key)
   const entry = result[key] as CacheEntry | undefined
   if (!entry) return null
@@ -36,7 +38,11 @@ async function getCached(key: string): Promise<{ report: AnalysisReport; extract
   return { report: entry.report, extracted: entry.extracted }
 }
 
-async function setCached(key: string, report: AnalysisReport, extracted: ExtractedCopy): Promise<void> {
+async function setCached(
+  key: string,
+  report: AnalysisReport,
+  extracted: ExtractedCopy,
+): Promise<void> {
   await chrome.storage.local.set({ [key]: { report, extracted, timestamp: Date.now() } })
 }
 
@@ -50,7 +56,6 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onMessage.addListener((message: BgMessage, _sender, sendResponse) => {
   if (message.type !== 'ANALYZE_PAGE') return false
-
   ;(async (): Promise<BgResponse> => {
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
       return { ok: false, code: 'MISSING_KEY', message: 'VITE_GEMINI_API_KEY not configured' }
@@ -121,9 +126,7 @@ chrome.runtime.onMessage.addListener((message: BgMessage, _sender, sendResponse)
     return { ok: true, report, extracted }
   })()
     .then(sendResponse)
-    .catch(err =>
-      sendResponse({ ok: false, code: 'UNKNOWN', message: String(err) } as BgResponse)
-    )
+    .catch(err => sendResponse({ ok: false, code: 'UNKNOWN', message: String(err) } as BgResponse))
 
   return true
 })

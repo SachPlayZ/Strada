@@ -47,4 +47,8 @@ export type BgMessage =
 
 export type BgResponse =
   | { ok: true; report: AnalysisReport; extracted: ExtractedCopy }
-  | { ok: false; code: 'RESTRICTED' | 'NO_COPY' | 'LLM_ERROR' | 'MISSING_KEY' | 'UNKNOWN'; message: string }
+  | {
+      ok: false
+      code: 'RESTRICTED' | 'NO_COPY' | 'LLM_ERROR' | 'MISSING_KEY' | 'UNKNOWN'
+      message: string
+    }

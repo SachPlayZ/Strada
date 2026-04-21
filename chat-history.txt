@@ -967,3 +967,191 @@ AI_CHAT_HISTORY/strada-build-claude-opus.md:
 USER: append to chat history.
 
 A: Appended Task 7 session to chat-history.txt (this file).
+
+================================================================================
+TURN — TEST SUITE (Claude Opus 4.7 via Cursor)
+Date: 2026-04-21
+================================================================================
+
+USER: Add a real test suite
+- Install vitest + @vitest/ui + happy-dom + @testing-library/react + @testing-library/jest-dom
+- Add test / test:watch scripts
+- Write four test files:
+  * src/lib/utils/text.test.ts — countSyllables, fleschKincaidGrade, fleschReadingEase
+    against known-good sentences ("The cat sat on the mat." → grade ~-1.4, ease ~116)
+  * src/lib/utils/scoring.test.ts — weightedOverall all-50=50, all-100=100, mixed case
+  * src/lib/graph/aggregator.test.ts — hand-rolled node results, assert Jaccard dedupe
+    + severity sort; stub createLLM with vi.mock
+  * src/lib/graph/graph.test.ts — integration test with FakeListChatModel proving
+    fan-out/fan-in actually aggregates (headline test)
+- Ship GitHub Action: pnpm typecheck && pnpm test && pnpm build
+
+A: Surveyed project (package.json, utils, graph, nodes, state). Installed deps:
+- First attempt: vitest@4 + @vitest/ui@4 → peer dep warning (vitest 4 needs vite 6+,
+  project on vite 5) — not a hard error but would bite later
+- Downgraded to vitest@^2 + @vitest/ui@^2 for clean vite-5 compatibility
+
+Configured test harness:
+- vitest.config.ts: @vitejs/plugin-react, @/* alias matching vite config,
+  happy-dom environment, globals: true, setupFiles: src/test/setup.ts
+- src/test/setup.ts: imports jest-dom matchers, stubs VITE_GEMINI_API_KEY so any
+  stray module-level env read during tests doesn't throw (defensive — llm.ts is
+  actually always mocked in the graph tests)
+
+Verified FakeListChatModel mechanics before writing tests:
+- node_modules/@langchain/core/dist/utils/testing/chat_models.{d.ts,js}
+- withStructuredOutput on the fake is RunnableLambda that JSON.parses each response
+- .invoke returns an AIMessage whose .content is the raw canned string
+- Single JSON-stringified NodeResult works for all 5 analysis nodes AND the
+  aggregator's summary call — because aggregator just reads .content as text
+
+Wrote src/lib/utils/text.test.ts (15 tests):
+- Hand-computed the "The cat sat on the mat." benchmark:
+  * words=6, sentences=1, syllables=6
+  * grade = 0.39*6 + 11.8*1 - 15.59 = -1.45 → assert (-1.6, -1.3)
+  * ease  = 206.835 - 1.015*6 - 84.6*1 = 116.145 → assert (115, 117)
+- Relative-ordering assertions (simple < complex grade; simple > complex ease)
+- countSyllables: short words, silent trailing e, multi-syllable, empty/non-alpha,
+  case insensitivity
+- dedupeIssues: same category+prefix collapses; different category keeps both
+- normalizeWhitespace + truncateChars coverage
+
+Wrote src/lib/utils/scoring.test.ts (8 tests):
+- all-50 → 50, all-100 → 100, all-0 → 0
+- Hand-rolled mixed case: {vp:100, cta:50, read:80, tone:60, jargon:40}
+  = 30 + 12.5 + 16 + 9 + 4 = 71.5 → round → 72
+- Weight-ordering assertion: only-vp=100 > only-cta=100 > only-jargon=100
+  (proves the 0.3/0.25/0.1 weights are applied in the right order)
+- Missing-category fallback to 50 (with @ts-expect-error for intentionally empty input)
+- severityRank: high < medium < low, high === 0
+
+Wrote src/lib/graph/aggregator.test.ts (6 tests):
+- vi.mock('../llm') → createLLM throws, forcing aggregator into fallback summary
+  branch (already in try/catch). Deterministic "Overall copy score: X/100. N
+  high-severity issues..." format is now locked in.
+- All-100 weighted roll-up → 100
+- Jaccard dedupe: crafted originalA/originalB with 10/11 token overlap ≈ 0.91,
+  threshold 0.85 → B should collapse into A; unrelated originalC kept.
+  Verified arithmetic: setA={sign,up,today,to,get,started,with,our,platform,
+  instantly}, setB=setA+{now}, |∩|=10, |∪|=11
+- Cross-category near-duplicates preserved (same text, different category)
+- Severity-then-category-weight sort: within high tier, vp(0.3) > cta(0.25) >
+  jargon(0.1) — asserted exact order ['vp-high', 'cta-high', 'jrg-high']
+- Missing node results default to 50 in categoryScores
+
+Wrote src/lib/graph/graph.test.ts (3 tests):
+- FakeListChatModel with ONE canned NodeResult JSON string covers every call
+  (the fake increments its internal i, but since createLLM() returns a new
+  instance each call, i=0 always — a single response is fine)
+- buildGraph().invoke(fixture): all 5 categoryScores populated, overallScore
+  in [0, 100], issues deduped during fan-in
+- analyzeExtractedCopy: well-formed report, non-empty summary
+- Parallel execution proof: Object.values(categoryScores).length === 5 all numeric
+
+First test run: 29/32 passing. 3 graph tests FAILED with:
+  "valueProp is already being used as a state attribute (a.k.a. a channel),
+   cannot also be used as a node name."
+
+The integration test caught a real production bug. LangGraph v1 forbids node
+names that collide with state channel names. Production graph was broken —
+buildGraph() would throw on first invocation in the actual extension too.
+
+Fix in src/lib/graph/graph.ts: renamed all 6 nodes to *_node suffix
+(valueProp_node, cta_node, jargon_node, tone_node, readability_node,
+aggregator_node) + updated all 11 addEdge references. Channel names unchanged
+(each node returns {valueProp: result} etc. — partial state update keys are
+independent of node names).
+
+Also fixed a silently-broken "typecheck" script:
+- Before: "tsc --noEmit" — but root tsconfig.json has files:[] + references,
+  so bare tsc was a no-op on the actual source tree. CI would have been green
+  on broken code.
+- After: "tsc -b --noEmit" — walks the project references, actually typechecks
+  src/ and the test files. Confirmed by running --force after the change.
+
+Shipped .github/workflows/ci.yml:
+- Runs on push + PR to main/master
+- Ubuntu, Node 22, pnpm 10 (matched local toolchain)
+- --frozen-lockfile so lockfile drift fails loudly
+- VITE_GEMINI_API_KEY stub env for build step (createLLM guard was defensive
+  about env at import time — stub keeps bundling happy; LLM is only called at
+  runtime inside the loaded extension)
+
+Final: 32/32 tests passing, typecheck clean, build clean.
+
+---
+
+USER: Wire CI + a linter
+- Rewrite ci.yml to 20 lines, on every push
+- pnpm add -D eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser
+  eslint-plugin-react-hooks prettier
+- "lint": "eslint src --max-warnings=0"
+- "format:check": "prettier --check src"
+
+A: Installed deps → eslint@10, @typescript-eslint@8, eslint-plugin-react-hooks@7.1.1,
+prettier@3.
+
+ESLint 10 requires flat config (no more .eslintrc). Checked plugin exports:
+- eslint-plugin-react-hooks@7.1.1 exposes configs.flat.recommended (flat-ready)
+- @typescript-eslint v8 works in flat via direct plugin + parser imports
+- Skipped the typescript-eslint meta package — not installed and not needed
+
+Wrote eslint.config.js (flat):
+- Files: src/**/*.{ts,tsx}
+- Parser: @typescript-eslint/parser with JSX + modules
+- Plugins: @typescript-eslint, react-hooks
+- Spreads tsPlugin.configs.recommended.rules + reactHooks.configs.flat.recommended.rules
+- Override: no-unused-vars with ^_ escape hatch on args/vars/caughtErrors
+- no-explicit-any: warn globally, off in *.test.ts (test fixtures sometimes need it)
+- Globals declared for MV3 context: chrome, window, document, console, fetch,
+  crypto, TextEncoder, setTimeout, etc.
+- Ignores: dist, node_modules, coverage, **/*.d.ts
+
+Wrote .prettierrc.json matching existing code style (semi:false, single quotes,
+trailing:all, printWidth:100, arrowParens:avoid) — deliberate, so format:check
+would accept the existing codebase with only cosmetic diffs.
+
+Wrote .prettierignore: dist, node_modules, coverage, pnpm-lock.yaml,
+src/components/ui (vendored shadcn primitives — treating them as generated code
+that the lint pipeline should not own).
+
+Added scripts: "lint": "eslint src --max-warnings=0", "format": "prettier --write src",
+"format:check": "prettier --check src".
+
+First dry run:
+- pnpm lint → clean on first run (types already consistent)
+- pnpm format:check → 14 files out of spec (mostly single vs double quotes,
+  trailing commas)
+
+Ran pnpm format once to establish a baseline → re-ran all gates:
+format:check ✓  lint ✓  typecheck ✓  test (32/32) ✓  build ✓
+
+Rewrote .github/workflows/ci.yml to 19 lines:
+  name: CI
+  on: [push, pull_request]
+  jobs:
+    verify:
+      runs-on: ubuntu-latest
+      env:
+        VITE_GEMINI_API_KEY: ci-build-placeholder
+      steps:
+        - uses: actions/checkout@v4
+        - uses: pnpm/action-setup@v4
+          with: { version: 10 }
+        - uses: actions/setup-node@v4
+          with: { node-version: 22, cache: pnpm }
+        - run: pnpm install --frozen-lockfile
+        - run: pnpm format:check
+        - run: pnpm lint
+        - run: pnpm typecheck
+        - run: pnpm test
+        - run: pnpm build
+
+Full chain: format:check → lint → typecheck → test → build. Any regression
+breaks the PR.
+
+---
+
+USER: append to chat history
+
+A: Appended this turn (test suite + CI/lint wiring) to chat-history.txt.

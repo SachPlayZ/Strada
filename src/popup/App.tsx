@@ -20,16 +20,22 @@ export default function App() {
 
     chrome.runtime.onMessage.addListener(function progressListener(msg) {
       if (msg.type === 'PROGRESS') {
-        setState(prev => prev.status === 'loading' ? { status: 'loading', stage: msg.stage } : prev)
+        setState(prev =>
+          prev.status === 'loading' ? { status: 'loading', stage: msg.stage } : prev,
+        )
         if (msg.stage === 'done') {
           chrome.runtime.onMessage.removeListener(progressListener)
         }
       }
     })
 
-    chrome.runtime.sendMessage({ type: 'ANALYZE_PAGE' }, (response) => {
+    chrome.runtime.sendMessage({ type: 'ANALYZE_PAGE' }, response => {
       if (chrome.runtime.lastError) {
-        setState({ status: 'error', code: 'UNKNOWN', message: chrome.runtime.lastError.message ?? 'Unknown error' })
+        setState({
+          status: 'error',
+          code: 'UNKNOWN',
+          message: chrome.runtime.lastError.message ?? 'Unknown error',
+        })
         return
       }
       if (!response) {

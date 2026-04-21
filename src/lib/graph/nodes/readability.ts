@@ -10,7 +10,9 @@ function gradeToScore(grade: number): number {
   return Math.max(0, Math.min(100, Math.round(100 - Math.max(0, grade - 6) * 10)))
 }
 
-export async function readabilityNode(state: AnalysisStateType): Promise<Partial<AnalysisStateType>> {
+export async function readabilityNode(
+  state: AnalysisStateType,
+): Promise<Partial<AnalysisStateType>> {
   try {
     const { bodyText, url } = state.extracted
 
@@ -56,7 +58,7 @@ Return a JSON with:
     // Clamp score to computed ±5 range to prevent LLM from ignoring metrics
     const clampedScore = Math.max(
       Math.max(0, computedScore - 10),
-      Math.min(Math.min(100, computedScore + 10), result.categoryScore)
+      Math.min(Math.min(100, computedScore + 10), result.categoryScore),
     )
     return { readability: { ...result, categoryScore: clampedScore } }
   } catch {

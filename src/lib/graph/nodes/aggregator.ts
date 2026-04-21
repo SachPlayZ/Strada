@@ -15,14 +15,18 @@ function dedupeByOverlap(issues: Issue[], threshold = 0.85): Issue[] {
   const kept: Issue[] = []
   for (const issue of issues) {
     const isDupe = kept.some(
-      k => k.category === issue.category && jaccardSimilarity(k.originalText, issue.originalText) >= threshold
+      k =>
+        k.category === issue.category &&
+        jaccardSimilarity(k.originalText, issue.originalText) >= threshold,
     )
     if (!isDupe) kept.push(issue)
   }
   return kept
 }
 
-export async function aggregatorNode(state: AnalysisStateType): Promise<Partial<AnalysisStateType>> {
+export async function aggregatorNode(
+  state: AnalysisStateType,
+): Promise<Partial<AnalysisStateType>> {
   const nodes = {
     value_prop: state.valueProp,
     cta: state.cta,
@@ -32,7 +36,7 @@ export async function aggregatorNode(state: AnalysisStateType): Promise<Partial<
   }
 
   const categoryScores = Object.fromEntries(
-    Object.entries(nodes).map(([cat, result]) => [cat, result?.categoryScore ?? 50])
+    Object.entries(nodes).map(([cat, result]) => [cat, result?.categoryScore ?? 50]),
   ) as Record<Category, number>
 
   const allIssues: Issue[] = Object.values(nodes).flatMap(r => r?.issues ?? [])
@@ -60,11 +64,17 @@ export async function aggregatorNode(state: AnalysisStateType): Promise<Partial<
   try {
     const llm = createLLM()
     const summaryResult = await llm.invoke(
-      `You analyzed a webpage's copy. Here are the category scores: ${JSON.stringify(categoryScores)}. Overall score: ${overallScore}/100. Top issues: ${sorted.slice(0, 3).map(i => i.problem).join('; ')}. Write a 2-3 sentence plain-English summary of what's working well and the most important things to fix. Be specific and actionable.`
+      `You analyzed a webpage's copy. Here are the category scores: ${JSON.stringify(categoryScores)}. Overall score: ${overallScore}/100. Top issues: ${sorted
+        .slice(0, 3)
+        .map(i => i.problem)
+        .join(
+          '; ',
+        )}. Write a 2-3 sentence plain-English summary of what's working well and the most important things to fix. Be specific and actionable.`,
     )
-    const content = typeof summaryResult.content === 'string'
-      ? summaryResult.content
-      : String(summaryResult.content)
+    const content =
+      typeof summaryResult.content === 'string'
+        ? summaryResult.content
+        : String(summaryResult.content)
     if (content.trim().length > 20) summary = content.trim()
   } catch {
     // fallback summary already set above

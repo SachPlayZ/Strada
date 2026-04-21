@@ -2,7 +2,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { Separator } from '@/components/ui/separator'
 import { IssueCard } from './IssueCard'
 import type { AnalysisReport, Category, ExtractedCopy } from '@/lib/types'
@@ -55,7 +60,9 @@ export function ReportView({ report, extracted }: ReportViewProps) {
           <p className="text-xs text-muted-foreground truncate min-w-0" title={report.meta.title}>
             {truncate(report.meta.title, 48)}
           </p>
-          <span className={`text-3xl font-bold tabular-nums shrink-0 ${scoreColor(report.overallScore)}`}>
+          <span
+            className={`text-3xl font-bold tabular-nums shrink-0 ${scoreColor(report.overallScore)}`}
+          >
             {report.overallScore}
           </span>
         </div>
@@ -146,19 +153,33 @@ export function ReportView({ report, extracted }: ReportViewProps) {
         <TabsContent value="copy" className="flex-1 min-h-0 mt-0">
           <ScrollArea className="h-[340px]">
             <div className="p-4">
-              <Accordion type="multiple" defaultValue={['headlines']} className="flex flex-col gap-1">
+              <Accordion
+                type="multiple"
+                defaultValue={['headlines']}
+                className="flex flex-col gap-1"
+              >
                 {extracted.headlines.length > 0 && (
-                  <StringListSection value="headlines" label="Headlines" items={extracted.headlines} />
+                  <StringListSection
+                    value="headlines"
+                    label="Headlines"
+                    items={extracted.headlines}
+                  />
                 )}
                 {extracted.ctas.length > 0 && (
                   <StringListSection value="ctas" label="CTAs" items={extracted.ctas} />
                 )}
                 {extracted.valueProps.length > 0 && (
-                  <StringListSection value="valueProps" label="Value Props" items={extracted.valueProps} />
+                  <StringListSection
+                    value="valueProps"
+                    label="Value Props"
+                    items={extracted.valueProps}
+                  />
                 )}
                 {extracted.bodyText && (
                   <AccordionItem value="bodyText" className="border rounded-lg px-3">
-                    <AccordionTrigger className="text-xs py-2 hover:no-underline">Body Text</AccordionTrigger>
+                    <AccordionTrigger className="text-xs py-2 hover:no-underline">
+                      Body Text
+                    </AccordionTrigger>
                     <AccordionContent className="pb-3">
                       <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
                         {truncate(extracted.bodyText, 1200)}

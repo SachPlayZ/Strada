@@ -24,11 +24,7 @@ export function fleschKincaidGrade(text: string): number {
 
   if (sentences.length === 0 || words.length === 0) return 0
 
-  return (
-    0.39 * (words.length / sentences.length) +
-    11.8 * (syllables / words.length) -
-    15.59
-  )
+  return 0.39 * (words.length / sentences.length) + 11.8 * (syllables / words.length) - 15.59
 }
 
 export function fleschReadingEase(text: string): number {
@@ -38,11 +34,7 @@ export function fleschReadingEase(text: string): number {
 
   if (sentences.length === 0 || words.length === 0) return 0
 
-  return (
-    206.835 -
-    1.015 * (words.length / sentences.length) -
-    84.6 * (syllables / words.length)
-  )
+  return 206.835 - 1.015 * (words.length / sentences.length) - 84.6 * (syllables / words.length)
 }
 
 export function dedupeIssues(issues: Issue[]): Issue[] {

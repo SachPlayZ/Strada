@@ -12,8 +12,8 @@ export function weightedOverall(categoryScores: Record<Category, number>): numbe
   return Math.round(
     Object.entries(WEIGHTS).reduce(
       (sum, [cat, weight]) => sum + (categoryScores[cat as Category] ?? 50) * weight,
-      0
-    )
+      0,
+    ),
   )
 }
 

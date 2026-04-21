@@ -34,14 +34,14 @@ export function extract(): ExtractedCopyInline {
   // CTAs: buttons, submit inputs, action-verb links/role=button
   const actionVerbRe = /^(get|start|try|sign|buy|download|book|request|learn|see|explore|join)\b/i
   const ctaCandidates = Array.from(
-    document.querySelectorAll('button, input[type="submit"], a, [role="button"]')
+    document.querySelectorAll('button, input[type="submit"], a, [role="button"]'),
   )
   const ctasSeen = new Set<string>()
   const ctas: string[] = []
   for (const el of ctaCandidates) {
     const tag = el.tagName.toLowerCase()
     const text = normalizeWS(
-      tag === 'input' ? (el as HTMLInputElement).value : el.textContent || ''
+      tag === 'input' ? (el as HTMLInputElement).value : el.textContent || '',
     )
     if (!text) continue
     const isButton = tag === 'button' || tag === 'input' || el.getAttribute('role') === 'button'
@@ -64,7 +64,10 @@ export function extract(): ExtractedCopyInline {
     while (sibling) {
       if (sibling.tagName.toLowerCase() === 'p') {
         const t = normalizeWS(sibling.textContent || '')
-        if (t) { valueProps.push(t); break }
+        if (t) {
+          valueProps.push(t)
+          break
+        }
       }
       sibling = sibling.nextElementSibling
     }
