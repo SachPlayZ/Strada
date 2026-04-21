@@ -622,7 +622,7 @@ Ready for you to kick off Task 1 in a fresh chat whenever you are — or I can
 start it here if you want to switch to agent mode.
 
 ================================================================================
-END OF TRANSCRIPT
+END OF ORIGINAL TRANSCRIPT
 ================================================================================
 
 === CHAT SESSION: Task 1 — Project Scaffold ===
@@ -666,3 +666,173 @@ USER: append chat history to '/Users/sachplayz/Projects/Strada/chat-history.txt'
 
 ASSISTANT: Appended this session's chat history to chat-history.txt.
 
+=== CHAT SESSION: Task 2 — Core Lib ===
+Date: 2026-04-21
+
+USER: See the plan from claude.md and move on to the 2nd task.
+
+ASSISTANT: Checked project state. Task 1 confirmed done (manifest.json, vite.config.ts, shadcn components, dist/ present).
+Executed Task 2 — Core Lib.
+
+Actions taken:
+- Ran: pnpm add zod @langchain/core @langchain/google-genai @langchain/langgraph
+- Created src/lib/types.ts: Category, Severity, ExtractedCopy, Issue, NodeResult, AnalysisReport, BgMessage, BgResponse discriminated unions
+- Created src/lib/schemas.ts: zod schemas for all types above
+- Created src/lib/llm.ts: createLLM() factory (gemini-2.0-flash, temp 0.2, throws on missing env var) + withStructuredOutput<T> helper
+- Created src/lib/utils/text.ts: countSyllables, fleschKincaidGrade, fleschReadingEase, normalizeWhitespace, truncateChars, dedupeIssues
+- Created src/lib/utils/scoring.ts: weightedOverall (weights: value_prop 0.3, cta 0.25, readability 0.2, tone 0.15, jargon 0.1), severityRank
+- pnpm tsc --noEmit: PASSED — clean
+
+Task status: task-2-core-lib -> completed
+
+---
+
+USER: append to chat history
+
+ASSISTANT: Appended this session's chat history to chat-history.txt.
+
+=== CHAT SESSION: Task 3 — Content Extractor ===
+Date: 2026-04-21
+
+USER: Move on to task 3 and use skills wherever required.
+
+A: Created src/content/extractor.ts.
+- Self-contained extract() — no @/lib imports, serializable via chrome.scripting.executeScript
+- Inline ExtractedCopyInline type (mirrors ExtractedCopy)
+- Headlines: H1/H2/H3, trimmed, deduped, max 20
+- CTAs: button, input[type=submit], [role=button], action-verb anchor regex /^(get|start|try|sign|buy|download|book|request|learn|see|explore|join)\b/i, max 30
+- valueProps: first H1 text, first sibling <p>, meta[name=description], meta[property=og:description]
+- bodyText: visible <p> > 40 chars excluding nav/footer/aside/[role=navigation]/[aria-hidden=true], joined \n\n, normalized whitespace, truncated 8000 chars
+- pnpm tsc --noEmit: PASSED — clean
+
+Task status: task-3-extractor -> completed
+
+---
+
+USER: Why the truncation
+
+A: LLM context limit. Big pages have thousands of words — send all, hit token ceiling, waste cost, slow response.
+8000 chars ≈ 1500-2000 tokens, enough for meaningful analysis without burning budget.
+
+---
+
+USER: Since we are creating nodes on langgraph for parallel execution can't we section it separately and analyze later aggregating?
+
+A: Valid idea, but category nodes are concern-based not section-based. cta node only cares about ctas[], valueProp only cares about headlines/valueProps. bodyText mainly feeds readability, tone, jargon.
+Chunking bodyText + parallel sub-nodes adds complexity: dynamic fan-out, merge logic per category, more LLM calls = more cost + latency.
+8000 chars covers most landing pages fully. Truncation only hits very long pages where readability analysis on a sample is still representative.
+Decision: keep truncation for now, note "large-page chunking" in NOTES.md production concerns (already planned).
+
+---
+
+USER: append to chat history.
+
+ASSISTANT: Appended this session's chat history to chat-history.txt.
+
+
+================================================================================
+SESSION — TASK 4: LANGGRAPH PIPELINE
+Date: 2026-04-21
+Model: Claude Sonnet 4.6 (claude-sonnet-4-6)
+Mode: Caveman (full)
+================================================================================
+
+USER: While task 3 is alrd on. Move on to task 4 as parallel and use skills wherever required.
+
+ASSISTANT: Built Task 4 (LangGraph pipeline) in parallel with Task 3.
+
+Read Task 2 artifacts (types.ts, schemas.ts, llm.ts, utils/scoring.ts, utils/text.ts) and LangGraph v1.2.9 JS docs via Context7.
+
+Files created:
+
+src/lib/graph/state.ts
+  - Annotation.Root with 7 channels: extracted, valueProp, cta, jargon, tone, readability, report
+  - All node result channels default to undefined, reducer = last-write
+
+src/lib/graph/nodes/valueProp.ts
+  - Prompt: evaluate clarity, differentiation, benefit focus, specificity
+  - Inputs: headlines + valueProps
+  - Try/catch fallback: { issues: [], categoryScore: 50, rationale: 'unavailable' }
+
+src/lib/graph/nodes/cta.ts
+  - Prompt: action clarity, value communication, urgency, generic language check
+  - Inputs: ctas[]
+  - Early return score=40 if no CTAs detected
+
+src/lib/graph/nodes/jargon.ts
+  - Prompt: buzzwords, unexplained acronyms, corporate-speak, vague superlatives
+  - Inputs: headlines + bodyText (truncated to 3000 chars)
+
+src/lib/graph/nodes/tone.ts
+  - Prompt: consistency, customer-centricity (you/your ratio), emotional resonance, authenticity, confidence level
+  - Inputs: headlines + valueProps + bodyText (truncated to 3000 chars)
+
+src/lib/graph/nodes/readability.ts
+  - Computes FK grade + Flesch Reading Ease locally from bodyText
+  - Feeds grade + sample to LLM for qualitative commentary
+  - Score formula: max(0, min(100, 100 - max(0, grade - 6) * 10))
+  - Clamps LLM-returned score to computed ±10 range (prevents LLM ignoring metrics)
+  - Skips LLM if bodyText < 50 chars
+
+src/lib/graph/nodes/aggregator.ts
+  - Jaccard similarity dedup at 85% threshold (same category + overlapping originalText)
+  - Sort: severityRank first, then category weight desc
+  - weightedOverall() from scoring utils
+  - LLM summary call (2-3 sentences); deterministic fallback if LLM fails
+  - Builds final AnalysisReport with meta (url, title, analyzedAt, model)
+
+src/lib/graph/graph.ts
+  - buildGraph(): StateGraph(AnalysisState) → 5 analysis nodes fan out from START in parallel → all → aggregator → END → compile()
+  - analyzeExtractedCopy(extracted): convenience wrapper
+
+pnpm tsc --noEmit: clean, no errors.
+
+---
+
+USER: append to chat history.
+
+ASSISTANT: Appended Task 4 session to chat-history.txt.
+
+
+
+================================================================================
+SESSION — TASK 5: BACKGROUND SERVICE WORKER
+Date: 2026-04-21
+Model: Claude Sonnet 4.6 (claude-sonnet-4-6)
+Mode: Caveman (full)
+================================================================================
+
+USER: move on to task 5. Use relevant skills
+
+A: Read existing artifacts — src/background/index.ts (stub), src/lib/types.ts, src/lib/schemas.ts, src/content/extractor.ts, src/lib/graph/graph.ts, manifest.json.
+
+Wrote src/background/index.ts — full background service worker:
+
+- CacheEntry interface { report, timestamp }
+- RESTRICTED patterns: chrome://, chrome-extension://, chrome.google.com/webstore, file://
+- sha256(input): crypto.subtle.digest → hex string (Web Crypto API, no deps)
+- getCached(key): chrome.storage.local.get → check TTL (10 min) → return cached AnalysisReport or null
+- setCached(key, report): chrome.storage.local.set with timestamp
+- sendProgress(stage): chrome.runtime.sendMessage PROGRESS broadcast (swallows error if popup closed)
+- onInstalled: console.log stub retained
+- onMessage listener:
+  - Guards: ANALYZE_PAGE type check; VITE_GEMINI_API_KEY present; active tab exists; URL not restricted
+  - sendProgress('extracting')
+  - chrome.scripting.executeScript({ func: extract }) → parse with ExtractedCopySchema.safeParse
+  - NO_COPY if body + headlines + valueProps all empty
+  - cacheKey = sha256(url + '|' + bodyText.slice(0, 500))
+  - Cache hit → sendProgress('done'), return cached report instantly
+  - sendProgress('analyzing')
+  - buildGraph().invoke({ extracted }) → sendProgress('aggregating') → AnalysisReportSchema.safeParse
+  - Error mapping: apiKey strings → MISSING_KEY; other throws → LLM_ERROR
+  - setCached + sendProgress('done') on success
+  - Returns true to keep async channel open for async sendResponse
+
+pnpm tsc --noEmit: PASSED — clean
+pnpm build: PASSED — dist/ produced, 539 modules transformed
+
+---
+
+USER: append to chat history
+
+A: Appended Task 5 session to chat-history.txt.

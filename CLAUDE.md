@@ -7,18 +7,18 @@ todos:
 - id: task-1-scaffold  
 content: "Task 1 — Scaffold project: Vite + React + TS + @crxjs/vite-plugin + Tailwind + shadcn + manifest skeleton; extension loads in Chrome"  
 status: completed
-- id: task-2-core-lib
-content: "Task 2 — Core lib: shared types, zod schemas, Gemini client, utilities (text, scoring, Flesch-Kincaid)"
-status: pending
-- id: task-3-extractor
-content: "Task 3 — Content extractor: headlines, CTAs, value props, body text; injected via chrome.scripting.executeScript"
-status: pending
-- id: task-4-langgraph
-content: "Task 4 — LangGraph pipeline: valueProp, cta, jargon, tone, readability nodes + aggregator + parallel StateGraph"
-status: pending
-- id: task-5-background
-content: "Task 5 — Background service worker: message handlers, extractor orchestration, graph invocation, result caching, error mapping"
-status: pending
+- id: task-2-core-lib  
+content: "Task 2 — Core lib: shared types, zod schemas, Gemini client, utilities (text, scoring, Flesch-Kincaid)"  
+status: completed
+- id: task-3-extractor  
+content: "Task 3 — Content extractor: headlines, CTAs, value props, body text; injected via chrome.scripting.executeScript"  
+status: completed
+- id: task-4-langgraph  
+content: "Task 4 — LangGraph pipeline: valueProp, cta, jargon, tone, readability nodes + aggregator + parallel StateGraph"  
+status: completed
+- id: task-5-background  
+content: "Task 5 — Background service worker: message handlers, extractor orchestration, graph invocation, result caching, error mapping"  
+status: completed
 - id: task-6-popup-ui
 content: "Task 6 — Popup UI: shadcn-only components for report, loading skeleton, empty/error states"
 status: pending
@@ -124,7 +124,7 @@ Each task below is **self-contained**. Before starting a task in a new chat, pas
 
 - `pnpm create vite` (React + TS), add `@crxjs/vite-plugin`.
 - Install Tailwind v3, configure `tailwind.config.js` + `postcss.config.js` + `src/popup/index.css` with `@tailwind` directives.
-- `pnpm dlx shadcn@latest init` → pick Tailwind, CSS vars, alias `@/*` → `src/*`. Add these primitives: `card`, `button`, `badge`, `tabs`, `accordion`, `progress`, `scroll-area`, `skeleton`, `alert`, `separator`.
+- `pnpm dlx shadcn@latest init` → pick Tailwind, CSS vars, alias `@/`* → `src/`*. Add these primitives: `card`, `button`, `badge`, `tabs`, `accordion`, `progress`, `scroll-area`, `skeleton`, `alert`, `separator`.
 - Author `manifest.json` (MV3): `action.default_popup = src/popup/index.html`, background ES module service worker at `src/background/index.ts`, permissions `["activeTab","scripting","storage"]`, `host_permissions: ["<all_urls>"]`, icons placeholders.
 - `vite.config.ts`: crx plugin, `@` alias → `src`, build outputs MV3 bundles to `dist/`.
 - Stub files: `src/background/index.ts` (console log on install), `src/popup/main.tsx` + `App.tsx` rendering a shadcn `Card` with "Strada — ready".
@@ -133,8 +133,8 @@ Each task below is **self-contained**. Before starting a task in a new chat, pas
 **Outputs:**
 
 - Compiling project, `pnpm build` produces `dist/` loadable via `chrome://extensions → Load unpacked`.
-- `src/components/ui/*` populated with the shadcn primitives listed above.
-- `components.json`, `tsconfig.json` with `@/*` path.
+- `src/components/ui/`* populated with the shadcn primitives listed above.
+- `components.json`, `tsconfig.json` with `@/`* path.
 
 **Acceptance criteria:**
 
@@ -182,7 +182,7 @@ Each task below is **self-contained**. Before starting a task in a new chat, pas
 
 **Do:**
 
-- `src/content/extractor.ts`: single exported `extract()` designed to be serialized into the page via `chrome.scripting.executeScript({ func: extract })`. It must **not** import from `@/lib/*` (injected code is self-contained); duplicate the minimal types it needs inline or define a narrow literal-return type.
+- `src/content/extractor.ts`: single exported `extract()` designed to be serialized into the page via `chrome.scripting.executeScript({ func: extract })`. It must **not** import from `@/lib/`* (injected code is self-contained); duplicate the minimal types it needs inline or define a narrow literal-return type.
 - Extraction rules:
   - `headlines`: H1/H2/H3 text, trimmed, deduped, max 20.
   - `ctas`: `button`, `input[type=submit]`, `a` matching action verb regex (`/^(get|start|try|sign|buy|download|book|request|learn|see|explore|join)\b/i`) or `[role=button]`. Max 30.
@@ -204,7 +204,7 @@ Each task below is **self-contained**. Before starting a task in a new chat, pas
 
 **Goal:** `buildGraph()` returns a compiled graph whose `.invoke(extracted)` returns `AnalysisReport`.
 
-**Context to provide:** Global context + Task 2 artifacts (`types.ts`, `schemas.ts`, `llm.ts`, `utils/*`).
+**Context to provide:** Global context + Task 2 artifacts (`types.ts`, `schemas.ts`, `llm.ts`, `utils/`*).
 
 **Do:**
 
