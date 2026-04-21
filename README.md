@@ -2,7 +2,7 @@
 
 Strada is a Chrome MV3 extension that extracts copy from any webpage and runs it through a parallel LangGraph pipeline powered by Gemini 3.0 Flash Preview. It scores five dimensions of copy quality — value proposition, CTAs, jargon, tone, and readability — and surfaces actionable issues with suggested rewrites directly in the extension popup.
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/xsR5_NnJMqg?si=lSCjdbkKMGST1VAZ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Strada demo](https://img.youtube.com/vi/xsR5_NnJMqg/maxresdefault.jpg)](https://www.youtube.com/watch?v=xsR5_NnJMqg)
 
 ## Architecture
 
