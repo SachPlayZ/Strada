@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Strada",
+  "version": "0.1.0",
+  "description": "Copy analyzer — extracts and scores page copy with AI",
+  "action": {
+    "default_popup": "src/popup/index.html"
+  },
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"]
+}

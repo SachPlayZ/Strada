@@ -1,0 +1,668 @@
+================================================================================
+STRADA — CHROME EXTENSION COPY ANALYZER
+AI Chat History (Cursor, Claude Opus 4.7)
+Date: 2026-04-21
+Transcript ID: bf604aa6-07d1-4b50-b7bb-317dfa42e150
+================================================================================
+
+
+================================================================================
+TURN 1 — USER
+================================================================================
+
+## What to Build
+Build a Chrome extension that analyzes website copy and provides actionable
+feedback to improve messaging, clarity, and engagement.
+
+## What the Tool Should Do
+
+- Extract copy from the current webpage (headlines, CTAs, value propositions,
+  body text)
+- Analyze the copy using an LLM to identify issues like:
+  - Unclear value propositions
+  - Weak CTAs
+  - Jargon or complex language
+  - Inconsistent tone
+  - Poor readability
+- Display analysis results in an extension popup
+- Provide specific, actionable improvement suggestions
+
+## Tech Stack
+- Chrome Extension Manifest V3
+- TypeScript
+- React for UI components
+- LangChain/LangGraph for AI orchestration
+- Gemini 3.0 Flash for LLM (no need to share API keys in submission)
+
+Note - Use ShadCN components and don't make your own components with css.
+Always use tailwind.
+
+1. Push code to a GitHub repository
+2. Include detailed instructions on how to run your code (deployment is
+   optional, not required)
+3. Include a `NOTES.md` file with:
+   - high level design
+   - any instructions to run
+   - what issues you forsee which needs to be taken care of in the productionised
+     version of the tool
+5. **If you used AI tools** (Claude, Cursor, GitHub Copilot, ChatGPT, etc.),
+   export and include your chat history so we can evaluate the prompts used to
+   generate code
+
+**Note:** We highly recommend using AI copilots (Claude, Cursor, GitHub Copilot,
+ChatGPT, etc.) to complete this trial efficiently. If you're unable to complete
+the implementation, you can still submit your work. In your `NOTES.md`,
+document what you attempted, what worked, what didn't, and why. We evaluate
+based on effort, problem-solving approach, and the progress you made — not just
+the final outcome.
+
+
+================================================================================
+TURN 2 — ASSISTANT
+================================================================================
+
+[Tool: Shell — `ls -la /Users/sachplayz/Projects/Strada`]
+  Result: empty workspace.
+
+Before drafting the plan, I want to confirm two decisions that meaningfully
+change the architecture.
+
+[Tool: AskQuestion]
+  Q1 (api_key): How should the Gemini API key be supplied?
+    - options_page: Extension Options page — user pastes key once, saved in
+      chrome.storage.sync (recommended for reviewers)
+    - popup_prompt: Prompt inside the popup on first use, saved in
+      chrome.storage.local
+    - env_build: Bundled at build time via .env.local (reviewer must rebuild)
+
+  Q2 (orchestration): How should the analysis pipeline be structured with
+                      LangChain/LangGraph?
+    - langgraph_multi: LangGraph StateGraph with parallel nodes (one per issue
+      type: value-prop, CTA, jargon, tone, readability) then an aggregator —
+      richer, showcases LangGraph
+    - langchain_single: Single LangChain chain with a structured-output prompt
+      returning all issues in one call — simpler and faster
+    - langgraph_sequential: LangGraph sequential pipeline:
+      extract -> analyze -> prioritize -> format suggestions
+
+  User answers:
+    api_key       = env_build
+    orchestration = langgraph_multi
+
+
+================================================================================
+TURN 3 — ASSISTANT (Plan v1)
+================================================================================
+
+Got it. Let me put together the plan.
+
+[Tool: CreatePlan]
+  name: copy-analyzer-chrome-extension
+  overview: Build a Chrome MV3 extension (Vite + React + TS + Tailwind +
+    shadcn) that extracts copy from the active tab, runs it through a LangGraph
+    StateGraph with parallel Gemini 3.0 Flash nodes (value-prop, CTA, jargon,
+    tone, readability) plus an aggregator, and renders a scored, actionable
+    report in the popup.
+
+  Plan body:
+
+  ## Tech Stack
+  - Vite + @crxjs/vite-plugin (MV3, HMR, TS)
+  - React 18, Tailwind v3, shadcn/ui (components.json, Radix primitives)
+  - LangGraph (@langchain/langgraph) + @langchain/google-genai -> gemini-3.0-flash
+  - Zod for structured LLM outputs
+  - pnpm
+
+  ## Repository Layout
+  strada/
+    manifest.json                  // MV3: action popup, background SW, scripting,
+                                   // activeTab, storage
+    vite.config.ts                 // crx plugin, path aliases
+    tailwind.config.js / postcss.config.js
+    components.json                // shadcn config
+    .env.example                   // VITE_GEMINI_API_KEY=...
+    src/
+      popup/
+        index.html
+        main.tsx
+        App.tsx                    // orchestrates fetch -> render
+        components/
+          ReportView.tsx           // overall score + tabs
+          IssueCard.tsx            // per-issue severity, original, suggestion, rewrite
+          CategorySection.tsx
+          EmptyState.tsx / ErrorState.tsx / LoadingState.tsx
+      components/ui/               // shadcn: card, button, badge, tabs, accordion,
+                                   // progress, scroll-area, skeleton, alert, separator
+      background/
+        index.ts                   // service worker: listens for ANALYZE_PAGE,
+                                   // drives pipeline, returns report
+      content/
+        extractor.ts               // runs via chrome.scripting.executeScript;
+                                   // returns ExtractedCopy
+      lib/
+        types.ts                   // ExtractedCopy, Issue, Category, Severity,
+                                   // AnalysisReport
+        schemas.ts                 // zod schemas for each node's output
+        llm.ts                     // ChatGoogleGenerativeAI factory
+                                   // (model: "gemini-3.0-flash", JSON mode)
+        graph/
+          state.ts                 // StateGraph annotation
+          graph.ts                 // buildGraph(): fan-out -> nodes -> aggregator
+          nodes/
+            valueProp.ts
+            cta.ts
+            jargon.ts
+            tone.ts
+            readability.ts         // hybrid: Flesch-Kincaid computed locally +
+                                   // LLM commentary
+            aggregator.ts          // overall score, top issues, exec summary
+        utils/
+          scoring.ts               // weighted overall score
+          text.ts                  // truncation, dedup, readability metrics
+    NOTES.md
+    README.md
+    AI_CHAT_HISTORY/               // exported Cursor chat
+
+  ## Data Flow (Mermaid)
+  flowchart LR
+      user[User clicks icon] --> popup[Popup React app]
+      popup -->|ANALYZE_PAGE| bg[Background SW]
+      bg -->|chrome.scripting.executeScript| cs[Content extractor]
+      cs -->|ExtractedCopy| bg
+      bg --> graph[LangGraph StateGraph]
+      subgraph graph [LangGraph]
+          start((start)) --> vp[valueProp]
+          start --> cta[cta]
+          start --> jrg[jargon]
+          start --> tone[tone]
+          start --> read[readability]
+          vp --> agg[aggregator]
+          cta --> agg
+          jrg --> agg
+          tone --> agg
+          read --> agg
+      end
+      graph -->|AnalysisReport| bg
+      bg -->|report| popup
+      popup --> ui[shadcn Report UI]
+
+  ## Key Implementation Details
+  - Copy extraction (content script): H1/H2/H3 headlines; CTAs from button,
+    a with action verbs, [role=button], input[type=submit]; value props from
+    hero-ish sections (first H1 + next paragraph, meta[name=description],
+    og:description); body paragraphs (> 40 chars, filter nav/footer). Truncate
+    to ~8k chars.
+  - Nodes return zod-validated JSON ({ issues: Issue[], categoryScore: 0-100,
+    rationale }). Low temperature (0.2). Each Issue carries originalText,
+    problem, suggestion, optional improvedText.
+  - Aggregator: weighted overall score, dedupes overlapping issues, sorts by
+    severity, produces 2-3 sentence executive summary.
+  - API key: read from import.meta.env.VITE_GEMINI_API_KEY at build time; SW
+    calls Gemini directly (no CORS issues in MV3 SW with host_permissions).
+  - Manifest permissions: activeTab, scripting, storage;
+    host_permissions: ["<all_urls>"] so scripting works;
+    action popup = src/popup/index.html; background = ES module service worker.
+  - UI: shadcn Tabs (Overview / Issues / Extracted Copy), Card per issue with
+    Badge for severity, Progress for category scores, Accordion for long
+    suggestions, Skeleton during loading, Alert for errors, ScrollArea for the
+    issue list. Strictly Tailwind utility classes, no custom CSS beyond
+    @tailwind directives + shadcn theme vars.
+
+  ## NOTES.md Contents
+  - High-level design (same mermaid diagram + short architecture narrative)
+  - Run instructions: pnpm i -> copy .env.example to .env.local, set
+    VITE_GEMINI_API_KEY -> pnpm build -> chrome://extensions -> Load unpacked
+    -> dist/
+  - Production concerns:
+    - API key in client bundle -> needs backend proxy (Cloud Run / Workers)
+      with auth + per-user quotas
+    - PII/privacy: page text leaves the browser; add opt-in, domain allowlist,
+      redaction of emails/tokens
+    - Restricted origins: chrome://, Chrome Web Store, PDF viewers, cross-origin
+      iframes
+    - SPAs and lazy-loaded content: extractor should wait for
+      document.readyState === 'complete' + small settle delay; consider
+      MutationObserver
+    - Large pages: smarter chunking/map-reduce instead of fixed truncation
+    - Rate limits / transient failures: retry with backoff, show partial
+      results if a node fails
+    - Caching: hash URL + text -> cache report in chrome.storage.local for N
+      minutes
+    - Cost controls: token accounting per analysis, daily cap
+    - i18n: detect language, skip or localize prompts
+    - Testing: unit tests for extractor and aggregator; mocked LLM for graph
+      tests
+  - "AI tools used" section pointing to AI_CHAT_HISTORY/
+
+  ## Deliverables Checklist
+  - Working MV3 extension loadable via dist/
+  - README with setup + run steps
+  - NOTES.md with design, run steps, production concerns
+  - AI chat history exported into AI_CHAT_HISTORY/
+  - Git repo initialized with clean history and .gitignore (node_modules,
+    dist, .env.local)
+
+  Todos:
+    1. scaffold              — Scaffold Vite + React + TS + @crxjs/vite-plugin
+                               project with pnpm, Tailwind, shadcn/ui
+    2. manifest              — Author manifest.json (MV3)
+    3. extractor             — Implement content extractor
+    4. types-schemas         — Define TS types & zod schemas
+    5. llm-client            — Gemini 3.0 Flash client via @langchain/google-genai
+    6. graph-nodes           — Implement LangGraph nodes
+    7. aggregator            — Implement aggregator node
+    8. graph-build           — Wire StateGraph fan-out / fan-in
+    9. background-sw         — Background service worker glue
+   10. popup-ui              — shadcn popup UI
+   11. loading-error-states  — Loading / empty / error states
+   12. notes-readme          — Write README.md + NOTES.md
+   13. ai-history            — Export Cursor chat into AI_CHAT_HISTORY/
+   14. git-init              — git init + .gitignore + GitHub push
+
+
+================================================================================
+TURN 4 — USER
+================================================================================
+
+Lets divide the plan into smaller tasks that can be executed in separate chats
+for better outputs.
+
+
+================================================================================
+TURN 5 — ASSISTANT (Plan v2 — 7 self-contained tasks)
+================================================================================
+
+Good idea. Let me rewrite the plan as a sequence of self-contained tasks with
+clear handoffs, so each one can be done in a fresh chat with minimal
+context-bleed.
+
+[Tool: Read — /Users/sachplayz/.cursor/plans/copy-analyzer-chrome-extension_5a4dc90c.plan.md]
+
+[Tool: Write — /Users/sachplayz/.cursor/plans/copy-analyzer-chrome-extension_5a4dc90c.plan.md]
+
+  ---
+  name: copy-analyzer-chrome-extension
+  overview: Build a Chrome MV3 extension (Vite + React + TS + Tailwind + shadcn)
+    that extracts copy from the active tab, runs it through a LangGraph
+    StateGraph with parallel Gemini 3.0 Flash nodes (value-prop, CTA, jargon,
+    tone, readability) plus an aggregator, and renders a scored, actionable
+    report in the popup. Work is split into 7 self-contained tasks, each
+    executable in its own chat.
+  todos:
+    - task-1-scaffold        : Vite + React + TS + @crxjs/vite-plugin + Tailwind
+                              + shadcn + manifest skeleton; extension loads in
+                              Chrome
+    - task-2-core-lib        : shared types, zod schemas, Gemini client,
+                              utilities (text, scoring, Flesch-Kincaid)
+    - task-3-extractor       : content extractor (headlines, CTAs, value props,
+                              body text); injected via
+                              chrome.scripting.executeScript
+    - task-4-langgraph       : LangGraph pipeline: valueProp, cta, jargon, tone,
+                              readability nodes + aggregator + parallel
+                              StateGraph
+    - task-5-background      : service worker: message handlers, extractor
+                              orchestration, graph invocation, result caching,
+                              error mapping
+    - task-6-popup-ui        : shadcn-only report UI, loading skeleton,
+                              empty/error states
+    - task-7-docs-delivery   : README.md, NOTES.md, AI_CHAT_HISTORY/,
+                              git init + GitHub push
+  ---
+
+  ## Tech Stack
+  - Vite + @crxjs/vite-plugin (MV3, HMR, TS)
+  - React 18, Tailwind v3, shadcn/ui (Radix primitives)
+  - LangGraph (@langchain/langgraph) + @langchain/google-genai -> gemini-3.0-flash
+  - Zod for structured LLM outputs
+  - pnpm
+
+  ## Final Repository Layout
+  strada/
+    manifest.json
+    vite.config.ts
+    tailwind.config.js / postcss.config.js
+    components.json
+    .env.example
+    src/
+      popup/
+        index.html
+        main.tsx
+        App.tsx
+        components/       // ReportView, IssueCard, CategorySection, *State
+      components/ui/      // shadcn primitives only
+      background/index.ts
+      content/extractor.ts
+      lib/
+        types.ts
+        schemas.ts
+        llm.ts
+        graph/
+          state.ts
+          graph.ts
+          nodes/{valueProp,cta,jargon,tone,readability,aggregator}.ts
+        utils/{scoring,text}.ts
+    NOTES.md
+    README.md
+    AI_CHAT_HISTORY/
+
+  ## End-to-End Data Flow (Mermaid)
+  flowchart LR
+      user[User clicks icon] --> popup[Popup React app]
+      popup -->|ANALYZE_PAGE| bg[Background SW]
+      bg -->|chrome.scripting.executeScript| cs[Content extractor]
+      cs -->|ExtractedCopy| bg
+      bg --> graph[LangGraph StateGraph]
+      subgraph graph [LangGraph]
+          startNode((start)) --> vp[valueProp]
+          startNode --> cta[cta]
+          startNode --> jrg[jargon]
+          startNode --> tone[tone]
+          startNode --> readNode[readability]
+          vp --> agg[aggregator]
+          cta --> agg
+          jrg --> agg
+          tone --> agg
+          readNode --> agg
+      end
+      graph -->|AnalysisReport| bg
+      bg -->|report| popup
+      popup --> ui[shadcn Report UI]
+
+  ---
+
+  ## Task Handoff Contract
+
+  Each task below is self-contained. Before starting a task in a new chat, paste
+  its "Context to provide" block plus the shared "Global context" below. Each
+  task ends with explicit Outputs (files written) and Acceptance criteria.
+
+  ### Global context (paste into every task)
+  - Stack: Vite + CRXJS + React 18 + TS + Tailwind v3 + shadcn/ui + LangGraph +
+    @langchain/google-genai (Gemini 3.0 Flash).
+  - Package manager: pnpm. Node >= 20.
+  - Model id: gemini-3.0-flash, temperature 0.2, JSON/structured output via
+    zod schemas.
+  - API key source: import.meta.env.VITE_GEMINI_API_KEY (loaded from .env.local
+    at build time). No runtime UI for key entry.
+  - UI rule: only shadcn components + Tailwind utilities. No custom CSS beyond
+    @tailwind directives and shadcn theme variables. No handwritten component
+    CSS files.
+  - No comments narrating code; only comments for non-obvious intent.
+
+  ---
+
+  ## Task 1 — Project scaffold
+  Goal: runnable empty Chrome MV3 extension that opens a "Hello" popup.
+  Context: Global context. No prior artifacts.
+  Do:
+    - pnpm create vite (React + TS); add @crxjs/vite-plugin
+    - Tailwind v3 (tailwind.config.js, postcss.config.js, src/popup/index.css
+      with @tailwind directives)
+    - pnpm dlx shadcn@latest init (Tailwind, CSS vars, @/* -> src/*); add
+      primitives: card, button, badge, tabs, accordion, progress, scroll-area,
+      skeleton, alert, separator
+    - manifest.json (MV3): action.default_popup = src/popup/index.html;
+      background ES module SW at src/background/index.ts; permissions
+      ["activeTab","scripting","storage"]; host_permissions ["<all_urls>"];
+      icon placeholders
+    - vite.config.ts: crx plugin, @ alias -> src, output dist/
+    - Stub src/background/index.ts (console log on install); src/popup/main.tsx
+      + App.tsx rendering shadcn Card "Strada — ready"
+    - .env.example with VITE_GEMINI_API_KEY=; .gitignore (node_modules, dist,
+      .env.local, .env)
+  Outputs: compiling project; pnpm build -> loadable dist/;
+           src/components/ui/* populated; components.json; tsconfig @/*.
+  Acceptance: Load unpacked dist/; popup shows shadcn Card "Strada — ready";
+              no SW console errors.
+
+  ---
+
+  ## Task 2 — Core lib (types, schemas, LLM client, utilities)
+  Goal: shared library consumed by extractor, graph, background, popup.
+  Context: Global context + Task 1 outputs.
+  Do:
+    - src/lib/types.ts: Category, Severity, ExtractedCopy, Issue, NodeResult,
+      AnalysisReport
+    - src/lib/schemas.ts: zod schemas for ExtractedCopy, Issue, NodeResult,
+      AnalysisReport
+    - src/lib/llm.ts: createLLM() -> ChatGoogleGenerativeAI
+      (model: 'gemini-3.0-flash', temperature 0.2,
+       apiKey: import.meta.env.VITE_GEMINI_API_KEY); export
+      withStructuredOutput<T>(schema)
+    - src/lib/utils/text.ts: countSyllables, fleschKincaidGrade,
+      fleschReadingEase, normalizeWhitespace, truncateChars, dedupeIssues
+    - src/lib/utils/scoring.ts: weightedOverall (weights
+      { value_prop: 0.3, cta: 0.25, readability: 0.2, tone: 0.15, jargon: 0.1 }),
+      severityRank
+    - Install: zod, @langchain/core, @langchain/google-genai,
+      @langchain/langgraph
+  Outputs: files above; no UI.
+  Acceptance: pnpm tsc --noEmit clean; createLLM() throws clear error if env
+              var missing; importable from popup and SW bundles.
+
+  ---
+
+  ## Task 3 — Content extractor
+  Goal: given a DOM, return clean ExtractedCopy.
+  Context: Global context + ExtractedCopy type + signature
+           export function extract(): ExtractedCopy.
+  Do:
+    - src/content/extractor.ts: single exported extract() serializable into the
+      page via chrome.scripting.executeScript({ func: extract }); must NOT
+      import from @/lib/*
+    - Extraction rules:
+      - headlines: H1/H2/H3 trimmed, deduped, max 20
+      - ctas: button, input[type=submit], a matching action verb regex
+        /^(get|start|try|sign|buy|download|book|request|learn|see|explore|join)\b/i
+        or [role=button]; max 30
+      - valueProps: first H1; first paragraph after it; meta[name=description];
+        meta[property=og:description]
+      - bodyText: visible <p> > 40 chars, excluding nav/footer/aside/
+        [role=navigation]/[aria-hidden=true]; joined by \n\n; whitespace
+        normalized
+    - Truncate bodyText to 8000 chars; extractedAt: Date.now();
+      title: document.title; url: location.href
+  Outputs: src/content/extractor.ts exporting extract and its inline return type.
+  Acceptance: calling extract against a jsdom fixture returns expected shape;
+              no @/lib imports.
+
+  ---
+
+  ## Task 4 — LangGraph pipeline
+  Goal: buildGraph() returns compiled graph where
+        .invoke(extracted) -> AnalysisReport.
+  Context: Global context + Task 2 artifacts.
+  Do:
+    - src/lib/graph/state.ts: Annotation.Root with channels:
+      extracted: ExtractedCopy; valueProp, cta, jargon, tone, readability:
+      NodeResult | undefined; report: AnalysisReport | undefined.
+    - src/lib/graph/nodes/*.ts: focused prompt per node; calls
+      createLLM().withStructuredOutput(NodeResultSchema); returns partial state
+      update. readability is hybrid: compute Flesch-Kincaid locally, feed grade
+      + samples to LLM, LLM returns commentary + issues; categoryScore derived
+      from grade.
+    - src/lib/graph/nodes/aggregator.ts: inputs are all 5 NodeResults; dedupe
+      overlapping issues (same originalText + category, 85% similarity); sort
+      by severityRank then category weight; overallScore =
+      weightedOverall(categoryScores); 2-3 sentence summary via final small
+      LLM call (deterministic template fallback); returns { report }.
+    - src/lib/graph/graph.ts: StateGraph(AnalysisState) -> 6 nodes ->
+      5 edges START -> analysis nodes -> 5 edges to aggregator ->
+      aggregator -> END -> .compile()
+    - Node-level try/catch -> on failure emit NodeResult
+      { issues:[], categoryScore: 50, rationale: 'unavailable' }
+  Outputs: src/lib/graph/**
+  Acceptance: scratch Node script: buildGraph().invoke({ extracted: fixture })
+              returns valid AnalysisReport (per schema); 5 analysis nodes run
+              in parallel (verifiable via timestamps or LangSmith).
+
+  ---
+
+  ## Task 5 — Background service worker
+  Goal: glue popup -> extractor -> graph -> popup; caching; error handling.
+  Context: Global context + Tasks 2, 3, 4.
+  Do:
+    - src/background/index.ts:
+      - listen for chrome.runtime.onMessage { type: 'ANALYZE_PAGE' }
+      - resolve active tab; reject restricted URLs (chrome://,
+        chrome-extension://, https://chrome.google.com/webstore, file:// when
+        not permitted)
+      - chrome.scripting.executeScript({ target: { tabId }, func: extract }) ->
+        parse with ExtractedCopySchema
+      - cache key: sha256(url + '|' + hashBody) -> chrome.storage.local; TTL 10
+        minutes
+      - on miss: buildGraph().invoke({ extracted }) -> validate with
+        AnalysisReportSchema -> cache -> return
+      - progress messages: { type: 'PROGRESS', stage }: extracting, analyzing,
+        aggregating, done
+      - error map: { ok: false, code: 'RESTRICTED'|'NO_COPY'|'LLM_ERROR'|
+        'MISSING_KEY'|'UNKNOWN', message }
+    - Add BgMessage / BgResponse discriminated unions in src/lib/types.ts
+      (additive).
+  Outputs: src/background/index.ts (+ types additions).
+  Acceptance: sendMessage { type: 'ANALYZE_PAGE' } resolves
+              { ok: true, report }; second call same URL is instant (cache);
+              chrome://extensions -> { ok:false, code:'RESTRICTED' }.
+
+  ---
+
+  ## Task 6 — Popup UI
+  Goal: polished shadcn-only report UI with proper states.
+  Context: Global context + AnalysisReport type + BgMessage/BgResponse + layout
+           description.
+  Do:
+    - src/popup/App.tsx: on mount sendMessage ANALYZE_PAGE; listen PROGRESS;
+      render LoadingState | ErrorState | EmptyState | ReportView
+    - LoadingState.tsx: shadcn Skeleton + current stage label
+    - ErrorState.tsx: shadcn Alert per error code; Retry button
+    - EmptyState.tsx: NO_COPY message; suggest content-heavy page
+    - ReportView.tsx:
+      - header: page title truncated, big score + Progress, 2-3 sentence summary
+      - Tabs: Overview | Issues | Extracted Copy
+        - Overview: per-category Progress + Badge rows; top 3 issues
+        - Issues: ScrollArea of IssueCards grouped by category via Accordion;
+          severity Badge, original excerpt, problem, suggestion, optional
+          improvedText copy button
+        - Extracted Copy: collapsible sections headlines/ctas/valueProps/bodyText
+    - popup ~420px wide, max 600px tall; internal scroll via ScrollArea
+    - Strictly Tailwind + shadcn; only custom CSS is src/popup/index.css
+      (Tailwind directives + shadcn base)
+  Outputs: src/popup/**
+  Acceptance: Manual test on 3 real sites; rg '\.css$' src matches only
+              src/popup/index.css.
+
+  ---
+
+  ## Task 7 — Docs & delivery
+  Goal: submission-ready repo.
+  Context: Global context + "assume everything else is done".
+  Do:
+    - README.md: pitch; features; screenshots placeholder; prerequisites;
+      setup (pnpm i -> cp .env.example .env.local -> set key -> pnpm build ->
+      load dist/ in chrome://extensions); dev (pnpm dev with CRXJS); scripts
+      table
+    - NOTES.md: high-level design (mermaid); run instructions (condensed);
+      production concerns (API key -> proxy; PII/privacy; restricted origins;
+      SPA lazy content; large-page chunking; retries & partial results;
+      caching; cost controls; i18n; testing); "what I'd do with another week";
+      AI tools used -> link AI_CHAT_HISTORY/
+    - Export Cursor chat(s) into AI_CHAT_HISTORY/ as markdown (one per topic)
+    - git init; commit in logical chunks matching task order; create GitHub
+      repo; push
+  Outputs: README.md, NOTES.md, AI_CHAT_HISTORY/*.md, GitHub repo.
+  Acceptance: fresh clone + pnpm i + key + pnpm build + load unpacked ->
+              works end-to-end; NOTES.md covers all prompt requirements.
+
+  ---
+
+  ## Execution order & parallelism
+  - Sequential for Tasks 1 -> 2 -> (3, 4 in parallel) -> 5 -> 6 -> 7.
+  - Tasks 3 and 4 can run in separate chats simultaneously once Task 2 is done;
+    they don't touch each other.
+
+  ## Deliverables Checklist
+  - Working MV3 extension loadable via dist/
+  - README with setup + run steps
+  - NOTES.md with design, run steps, production concerns
+  - AI chat history exported into AI_CHAT_HISTORY/
+  - Git repo on GitHub with clean history
+
+[After Write, assistant replied:]
+
+Plan restructured into 7 self-contained tasks. Each has a paste-ready
+"Context to provide" block, explicit Outputs, and Acceptance criteria so the
+next chat can verify the handoff before starting.
+
+Task breakdown:
+  1. Scaffold — Vite + CRXJS + React + TS + Tailwind + shadcn + MV3 manifest.
+     Ends with a "Hello" popup loading in Chrome.
+  2. Core lib — types.ts, schemas.ts, llm.ts, utils/{text,scoring}.ts. Pure
+     TS, unit-testable, no UI.
+  3. Content extractor — Self-contained extract() function (no @/lib imports
+     so it serializes into the page cleanly).
+  4. LangGraph pipeline — Nodes + aggregator + parallel StateGraph.
+     Verifiable via a scratch Node script.
+  5. Background SW — Message routing, extractor injection, graph invocation,
+     10-min cache, typed error codes.
+  6. Popup UI — shadcn-only report UI with loading/error/empty states.
+  7. Docs & delivery — README, NOTES, AI chat history export, git/GitHub.
+
+Key properties of this split:
+  - Hand-off contract per task means each fresh chat gets only what it needs —
+    no giant context dump, no cross-task bleed.
+  - Tasks 3 and 4 can run in parallel chats after Task 2 finishes (they share
+    only types from Task 2, never touch each other).
+  - Every task has acceptance criteria you or the next chat can run in < 30s
+    to confirm the previous step is solid before building on it.
+  - I added a Global context block at the top so every chat starts with the
+    same stack assumptions, model id, UI rule (shadcn + Tailwind only), and
+    API key source.
+
+Ready for you to kick off Task 1 in a fresh chat whenever you are — or I can
+start it here if you want to switch to agent mode.
+
+================================================================================
+END OF TRANSCRIPT
+================================================================================
+
+=== CHAT SESSION: Task 1 — Project Scaffold ===
+Date: 2026-04-21
+
+USER: '/Users/sachplayz/.cursor/plans/copy-analyzer-chrome-extension_5a4dc90c.plan.md' Follow the Plan in CLAUDE.md. Use SKILLS wherever required and update the task when done. Task 1 to be done now.
+
+ASSISTANT: Executed Task 1 — Project Scaffold.
+
+Actions taken:
+- Created package.json with React 18, Vite 5, @crxjs/vite-plugin 2.4.0, Tailwind v3, shadcn primitives, @types/chrome, @types/node
+- Created tsconfig.json (project references) + tsconfig.app.json + tsconfig.node.json with @/* -> src/* path alias
+- Created manifest.json (MV3): activeTab, scripting, storage permissions; background SW at src/background/index.ts; popup at src/popup/index.html
+- Created vite.config.ts: crx plugin, @ alias via fileURLToPath/import.meta.url (ESM-safe), dist output
+- Created tailwind.config.js + postcss.config.js
+- Created src/popup/index.css with @tailwind directives + shadcn CSS variable theme (slate base)
+- Created src/popup/index.html, main.tsx, App.tsx (Card with "Strada — ready")
+- Created src/background/index.ts (onInstalled log stub)
+- Created src/lib/utils.ts (cn() helper for shadcn)
+- Created src/vite-env.d.ts (/// <reference types="vite/client" />)
+- Created components.json for shadcn
+- Created .env.example (VITE_GEMINI_API_KEY=) and .gitignore
+- Ran pnpm install + pnpm rebuild esbuild
+- Used shadcn skill: pnpm dlx shadcn@latest add card button badge tabs accordion progress scroll-area skeleton alert separator
+- Fixed component install path (CLI wrote to @/components/ui/ instead of src/components/ui/ — moved files)
+- pnpm build: PASSED — dist/ produced with manifest.json, popup HTML, service-worker-loader.js, CSS bundle
+
+Issues resolved:
+- @crxjs/vite-plugin beta -> upgraded to 2.4.0 stable
+- esbuild build scripts blocked by pnpm -> added pnpm.onlyBuiltDependencies + pnpm rebuild esbuild
+- __dirname unavailable in ESM vite config -> switched to fileURLToPath(new URL('./src', import.meta.url))
+- chrome global TS error -> added @types/chrome
+- CSS import TS error -> added src/vite-env.d.ts with vite/client reference
+- shadcn alias resolution -> added paths to root tsconfig.json
+
+Task status: task-1-scaffold -> completed
+
+---
+
+USER: append chat history to '/Users/sachplayz/Projects/Strada/chat-history.txt'
+
+ASSISTANT: Appended this session's chat history to chat-history.txt.
+
