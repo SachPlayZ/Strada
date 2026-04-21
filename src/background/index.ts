@@ -1,7 +1,7 @@
 import { extract } from '../content/extractor'
 import { buildGraph } from '../lib/graph/graph'
 import { ExtractedCopySchema, AnalysisReportSchema } from '../lib/schemas'
-import type { BgMessage, BgResponse, AnalysisReport } from '../lib/types'
+import type { BgMessage, BgResponse, AnalysisReport, ExtractedCopy } from '../lib/types'
 
 const RESTRICTED = [
   /^chrome:\/\//,
@@ -21,10 +21,11 @@ async function sha256(input: string): Promise<string> {
 
 interface CacheEntry {
   report: AnalysisReport
+  extracted: ExtractedCopy
   timestamp: number
 }
 
-async function getCached(key: string): Promise<AnalysisReport | null> {
+async function getCached(key: string): Promise<{ report: AnalysisReport; extracted: ExtractedCopy } | null> {
   const result = await chrome.storage.local.get(key)
   const entry = result[key] as CacheEntry | undefined
   if (!entry) return null
@@ -32,11 +33,11 @@ async function getCached(key: string): Promise<AnalysisReport | null> {
     chrome.storage.local.remove(key)
     return null
   }
-  return entry.report
+  return { report: entry.report, extracted: entry.extracted }
 }
 
-async function setCached(key: string, report: AnalysisReport): Promise<void> {
-  await chrome.storage.local.set({ [key]: { report, timestamp: Date.now() } })
+async function setCached(key: string, report: AnalysisReport, extracted: ExtractedCopy): Promise<void> {
+  await chrome.storage.local.set({ [key]: { report, extracted, timestamp: Date.now() } })
 }
 
 function sendProgress(stage: 'extracting' | 'analyzing' | 'aggregating' | 'done'): void {
@@ -91,7 +92,7 @@ chrome.runtime.onMessage.addListener((message: BgMessage, _sender, sendResponse)
     const cached = await getCached(cacheKey)
     if (cached) {
       sendProgress('done')
-      return { ok: true, report: cached }
+      return { ok: true, report: cached.report, extracted: cached.extracted }
     }
 
     sendProgress('analyzing')
@@ -114,10 +115,10 @@ chrome.runtime.onMessage.addListener((message: BgMessage, _sender, sendResponse)
       return { ok: false, code: 'LLM_ERROR', message: msg }
     }
 
-    await setCached(cacheKey, report)
+    await setCached(cacheKey, report, extracted)
     sendProgress('done')
 
-    return { ok: true, report }
+    return { ok: true, report, extracted }
   })()
     .then(sendResponse)
     .catch(err =>

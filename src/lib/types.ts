@@ -46,5 +46,5 @@ export type BgMessage =
   | { type: 'PROGRESS'; stage: 'extracting' | 'analyzing' | 'aggregating' | 'done' }
 
 export type BgResponse =
-  | { ok: true; report: AnalysisReport }
+  | { ok: true; report: AnalysisReport; extracted: ExtractedCopy }
   | { ok: false; code: 'RESTRICTED' | 'NO_COPY' | 'LLM_ERROR' | 'MISSING_KEY' | 'UNKNOWN'; message: string }
