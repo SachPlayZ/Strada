@@ -38,6 +38,7 @@ export interface AnalysisReport {
     title: string
     analyzedAt: number
     model: string
+    estimatedCategories: Category[]
   }
 }
 

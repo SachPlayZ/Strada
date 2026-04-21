@@ -2,9 +2,10 @@ import { createLLM } from '../../llm'
 import { NodeResultSchema } from '../../schemas'
 import { fleschKincaidGrade, fleschReadingEase, truncateChars } from '../../utils/text'
 import { clamp } from '../../utils/scoring'
+import { withRetry, ESTIMATED_SENTINEL } from '../../utils/retry'
 import type { AnalysisStateType } from '../state'
 
-const FALLBACK = { issues: [], categoryScore: 50, rationale: 'unavailable' }
+const FALLBACK = { issues: [], categoryScore: 50, rationale: ESTIMATED_SENTINEL }
 
 function gradeToScore(grade: number): number {
   // Grade 6 or below = 100, grade 16+ = 0; linear in between
@@ -55,7 +56,7 @@ Return a JSON with:
 - categoryScore: ${computedScore} (use this computed score, adjust ±10 based on qualitative assessment)
 - rationale: mention the FK grade level and what it means for the target audience`
 
-    const result = await chain.invoke(prompt)
+    const result = await withRetry(() => chain.invoke(prompt))
     const clampedScore = clamp(
       result.categoryScore,
       Math.max(0, computedScore - 10),

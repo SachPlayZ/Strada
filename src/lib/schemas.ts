@@ -42,5 +42,6 @@ export const AnalysisReportSchema = z.object({
     title: z.string(),
     analyzedAt: z.number(),
     model: z.string(),
+    estimatedCategories: z.array(z.enum(['value_prop', 'cta', 'jargon', 'tone', 'readability'])),
   }),
 })

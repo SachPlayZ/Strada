@@ -45,6 +45,7 @@ interface ReportViewProps {
 
 export function ReportView({ report, extracted }: ReportViewProps) {
   const topIssues = report.issues.slice(0, 3)
+  const estimated = new Set<Category>(report.meta.estimatedCategories ?? [])
   const issuesByCategory = categoryOrder.reduce<Record<Category, typeof report.issues>>(
     (acc, cat) => {
       acc[cat] = report.issues.filter(i => i.category === cat)
@@ -85,10 +86,22 @@ export function ReportView({ report, extracted }: ReportViewProps) {
               <div className="flex flex-col gap-2">
                 {categoryOrder.map(cat => {
                   const score = report.categoryScores[cat] ?? 0
+                  const isEstimated = estimated.has(cat)
                   return (
                     <div key={cat} className="flex flex-col gap-1">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{categoryLabels[cat]}</span>
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          {categoryLabels[cat]}
+                          {isEstimated && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] px-1 py-0 h-4 border-amber-500 text-amber-600"
+                              title="Category score is a fallback — the LLM call failed after retries."
+                            >
+                              Estimated
+                            </Badge>
+                          )}
+                        </span>
                         <Badge variant={scoreBadgeVariant(score)} className="text-[10px]">
                           {score}
                         </Badge>

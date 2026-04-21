@@ -86,7 +86,14 @@ pnpm dev
 
 **Large pages** — `bodyText` is truncated to 8000 chars. Pages with extensive copy (long-form articles, documentation) will have their tail silently dropped. Chunking + map-reduce over multiple LLM calls would give complete coverage.
 
-**LLM retries and partial results** — Currently a node failure returns a fixed fallback `{ issues: [], categoryScore: 50, rationale: 'unavailable' }`. Production should retry with exponential backoff and surface which categories are estimated vs. computed in the UI.
+**LLM retries and partial results** — Each node wraps `chain.invoke` in
+`withRetry` (3 attempts, exponential 400→800 ms backoff). If all attempts fail,
+the node returns a fallback whose `rationale` is the `__ESTIMATED__` sentinel;
+the aggregator collects those into `report.meta.estimatedCategories`, and the
+popup renders an "Estimated" pill next to the affected category scores so users
+know the number is a fallback, not a computed result. Hardening still to do:
+classify errors (transient vs. 4xx schema failure) so we don't retry a
+deterministic bad prompt, and add per-node circuit breaking.
 
 **Caching** — Cache key is a SHA-256 over the canonical JSON of the full extracted object (url, headlines, ctas, valueProps, body). A/B test variants that change any of those fields get distinct cache entries. TTL is 10 minutes in `chrome.storage.local`; no cross-device sync, no eviction beyond TTL.
 
@@ -94,7 +101,15 @@ pnpm dev
 
 **i18n** — All prompts and UI strings are English-only. Non-English copy will be scored against English writing conventions, producing misleading results.
 
-**Testing** — No automated tests exist. Unit tests for `text.ts` and `scoring.ts` are straightforward. Integration tests for the graph require a real API key; a mock LLM (`FakeListChatModel` from LangChain) would allow deterministic graph tests.
+**Testing** — 37 unit + integration tests via Vitest. `text.ts` and `scoring.ts`
+are covered with FK-grade benchmarks and hand-rolled weighted-score cases.
+`withRetry` has exponential-backoff and exhaustion tests under fake timers. The
+graph uses `FakeListChatModel` to assert fan-in: all five category scores
+populated, Jaccard dedupe collapses near-duplicates, weighted aggregation rolls
+up correctly. A separate end-to-end test forces every node's LLM to throw and
+asserts the aggregator marks all five categories as estimated in
+`report.meta.estimatedCategories`. CI runs format + lint + typecheck + test +
+build on every PR. Missing: Playwright/E2E coverage of the popup UI.
 
 ## What I'd Do With Another Week
 
@@ -105,7 +120,7 @@ pnpm dev
 - **MutationObserver mode** — Re-run extraction after a configurable idle delay to catch SPA-loaded content.
 - **Export** — Download the full `AnalysisReport` as JSON or a formatted PDF for sharing with clients.
 - **LangSmith tracing** — Wire in `LANGCHAIN_TRACING_V2` for observability on which prompts produce bad outputs.
-- **Automated tests** — Unit tests for utilities; graph tests using `FakeListChatModel`; Playwright for the popup UI.
+- **E2E tests** — Playwright coverage of the popup (loading → report → error transitions) on top of the existing Vitest unit + graph tests.
 - **Chunked analysis** — Split long `bodyText` into segments, run readability node on each, merge results.
 
 ## AI Tools Used

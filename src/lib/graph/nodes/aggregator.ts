@@ -1,7 +1,8 @@
 import { createLLM } from '../../llm'
 import { weightedOverall, severityRank, WEIGHTS } from '../../utils/scoring'
+import { ESTIMATED_SENTINEL } from '../../utils/retry'
 import type { AnalysisStateType } from '../state'
-import type { Issue, Category, AnalysisReport } from '../../types'
+import type { Issue, Category, AnalysisReport, NodeResult } from '../../types'
 
 function jaccardSimilarity(a: string, b: string): number {
   const setA = new Set(a.toLowerCase().split(/\s+/))
@@ -27,7 +28,7 @@ function dedupeByOverlap(issues: Issue[], threshold = 0.85): Issue[] {
 export async function aggregatorNode(
   state: AnalysisStateType,
 ): Promise<Partial<AnalysisStateType>> {
-  const nodes = {
+  const nodes: Record<Category, NodeResult | undefined> = {
     value_prop: state.valueProp,
     cta: state.cta,
     jargon: state.jargon,
@@ -38,6 +39,12 @@ export async function aggregatorNode(
   const categoryScores = Object.fromEntries(
     Object.entries(nodes).map(([cat, result]) => [cat, result?.categoryScore ?? 50]),
   ) as Record<Category, number>
+
+  const estimatedCategories: Category[] = (
+    Object.entries(nodes) as [Category, NodeResult | undefined][]
+  )
+    .filter(([, r]) => !r || r.rationale === ESTIMATED_SENTINEL)
+    .map(([cat]) => cat)
 
   const allIssues: Issue[] = Object.values(nodes).flatMap(r => r?.issues ?? [])
 
@@ -82,6 +89,7 @@ export async function aggregatorNode(
       title: state.extracted.title,
       analyzedAt: Date.now(),
       model: 'gemini-2.0-flash',
+      estimatedCategories,
     },
   }
 

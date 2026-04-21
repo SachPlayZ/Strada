@@ -74,6 +74,7 @@ describe('aggregatorNode', () => {
     })
     expect(out.report!.meta.url).toBe(extracted.url)
     expect(out.report!.meta.title).toBe(extracted.title)
+    expect(out.report!.meta.estimatedCategories).toEqual([])
   })
 
   it('falls back to a deterministic summary when the LLM throws', async () => {
@@ -204,7 +205,7 @@ describe('aggregatorNode', () => {
     expect(highIds).toEqual(['vp-high', 'cta-high', 'jrg-high'])
   })
 
-  it('defaults missing node results to score 50', async () => {
+  it('defaults missing node results to score 50 and marks them as estimated', async () => {
     const out = await aggregatorNode(baseState({}))
     expect(out.report!.categoryScores).toEqual({
       value_prop: 50,
@@ -215,5 +216,21 @@ describe('aggregatorNode', () => {
     })
     expect(out.report!.overallScore).toBe(50)
     expect(out.report!.issues).toHaveLength(0)
+    expect(out.report!.meta.estimatedCategories.sort()).toEqual(
+      ['cta', 'jargon', 'readability', 'tone', 'value_prop'].sort(),
+    )
+  })
+
+  it('flags categories whose node returned the ESTIMATED sentinel', async () => {
+    const out = await aggregatorNode(
+      baseState({
+        valueProp: result(80, []),
+        cta: { issues: [], categoryScore: 50, rationale: '__ESTIMATED__' },
+        jargon: result(70, []),
+        tone: { issues: [], categoryScore: 50, rationale: '__ESTIMATED__' },
+        readability: result(75, []),
+      }),
+    )
+    expect(out.report!.meta.estimatedCategories.sort()).toEqual(['cta', 'tone'].sort())
   })
 })

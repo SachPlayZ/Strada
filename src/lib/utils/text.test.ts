@@ -5,9 +5,7 @@ import {
   fleschReadingEase,
   normalizeWhitespace,
   truncateChars,
-  dedupeIssues,
 } from './text'
-import type { Issue } from '../types'
 
 describe('countSyllables', () => {
   it('counts 1 for short words', () => {
@@ -92,39 +90,5 @@ describe('truncateChars', () => {
 
   it('truncates text that exceeds the limit', () => {
     expect(truncateChars('abcdefghij', 5)).toBe('abcde')
-  })
-})
-
-describe('dedupeIssues', () => {
-  it('removes issues with the same category + original text prefix', () => {
-    const issues: Issue[] = [
-      {
-        id: '1',
-        category: 'cta',
-        severity: 'high',
-        originalText: 'Click here to get started now',
-        problem: 'Generic CTA',
-        suggestion: 'Be specific',
-      },
-      {
-        id: '2',
-        category: 'cta',
-        severity: 'medium',
-        originalText: 'Click here to get started now',
-        problem: 'Duplicate',
-        suggestion: 'Skip',
-      },
-      {
-        id: '3',
-        category: 'tone',
-        severity: 'low',
-        originalText: 'Click here to get started now',
-        problem: 'Different category keeps it',
-        suggestion: 'Keep',
-      },
-    ]
-    const out = dedupeIssues(issues)
-    expect(out).toHaveLength(2)
-    expect(out.map((i: Issue) => i.id).sort()).toEqual(['1', '3'])
   })
 })

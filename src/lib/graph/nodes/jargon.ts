@@ -1,9 +1,10 @@
 import { createLLM } from '../../llm'
 import { NodeResultSchema } from '../../schemas'
 import { truncateChars } from '../../utils/text'
+import { withRetry, ESTIMATED_SENTINEL } from '../../utils/retry'
 import type { AnalysisStateType } from '../state'
 
-const FALLBACK = { issues: [], categoryScore: 50, rationale: 'unavailable' }
+const FALLBACK = { issues: [], categoryScore: 50, rationale: ESTIMATED_SENTINEL }
 
 export async function jargonNode(state: AnalysisStateType): Promise<Partial<AnalysisStateType>> {
   try {
@@ -31,7 +32,7 @@ Return a JSON with:
 - categoryScore: 0-100 (100 = clear, jargon-free language)
 - rationale: 1-2 sentence explanation`
 
-    const result = await chain.invoke(prompt)
+    const result = await withRetry(() => chain.invoke(prompt))
     return { jargon: result }
   } catch {
     return { jargon: FALLBACK }

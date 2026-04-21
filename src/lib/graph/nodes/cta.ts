@@ -1,8 +1,9 @@
 import { createLLM } from '../../llm'
 import { NodeResultSchema } from '../../schemas'
+import { withRetry, ESTIMATED_SENTINEL } from '../../utils/retry'
 import type { AnalysisStateType } from '../state'
 
-const FALLBACK = { issues: [], categoryScore: 50, rationale: 'unavailable' }
+const FALLBACK = { issues: [], categoryScore: 50, rationale: ESTIMATED_SENTINEL }
 
 export async function ctaNode(state: AnalysisStateType): Promise<Partial<AnalysisStateType>> {
   try {
@@ -29,7 +30,7 @@ Return a JSON with:
 - categoryScore: 0-100 (100 = all CTAs are compelling and clear)
 - rationale: 1-2 sentence explanation`
 
-    const result = await chain.invoke(prompt)
+    const result = await withRetry(() => chain.invoke(prompt))
     return { cta: result }
   } catch {
     return { cta: FALLBACK }
