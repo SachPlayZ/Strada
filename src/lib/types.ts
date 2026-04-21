@@ -39,12 +39,30 @@ export interface AnalysisReport {
     analyzedAt: number
     model: string
     estimatedCategories: Category[]
+    estimatedReasons?: Partial<Record<Category, string>>
   }
+}
+
+export type ProgressStage = 'extracting' | 'analyzing' | 'aggregating' | 'done'
+
+export type Progress = {
+  type: 'PROGRESS'
+  stage: ProgressStage
+  percent: number
+  detail: string
+  completed: Category[]
+}
+
+export type TabInfo = {
+  url: string
+  title: string
+  restricted: boolean
 }
 
 export type BgMessage =
   | { type: 'ANALYZE_PAGE' }
-  | { type: 'PROGRESS'; stage: 'extracting' | 'analyzing' | 'aggregating' | 'done' }
+  | { type: 'GET_TAB_INFO' }
+  | Progress
 
 export type BgResponse =
   | { ok: true; report: AnalysisReport; extracted: ExtractedCopy }
@@ -53,3 +71,7 @@ export type BgResponse =
       code: 'RESTRICTED' | 'NO_COPY' | 'LLM_ERROR' | 'MISSING_KEY' | 'UNKNOWN'
       message: string
     }
+
+export type TabInfoResponse =
+  | { ok: true; tab: TabInfo }
+  | { ok: false; message: string }

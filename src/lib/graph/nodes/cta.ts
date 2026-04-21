@@ -3,7 +3,10 @@ import { NodeResultSchema } from '../../schemas'
 import { withRetry, ESTIMATED_SENTINEL } from '../../utils/retry'
 import type { AnalysisStateType } from '../state'
 
-const FALLBACK = { issues: [], categoryScore: 50, rationale: ESTIMATED_SENTINEL }
+function fallback(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err)
+  return { issues: [], categoryScore: 50, rationale: `${ESTIMATED_SENTINEL}${msg}` }
+}
 
 export async function ctaNode(state: AnalysisStateType): Promise<Partial<AnalysisStateType>> {
   try {
@@ -30,9 +33,10 @@ Return a JSON with:
 - categoryScore: 0-100 (100 = all CTAs are compelling and clear)
 - rationale: 1-2 sentence explanation`
 
-    const result = await withRetry(() => chain.invoke(prompt))
+    const result = await withRetry(() => chain.invoke(prompt), { label: 'cta' })
     return { cta: result }
-  } catch {
-    return { cta: FALLBACK }
+  } catch (err) {
+    console.error('[Strada/cta] failed:', err)
+    return { cta: fallback(err) }
   }
 }

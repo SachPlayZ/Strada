@@ -33,9 +33,12 @@ export function IssueCard({ issue }: IssueCardProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground italic truncate max-w-[80%]">
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm min-w-0 w-full">
+      <div className="flex items-start justify-between gap-2 min-w-0">
+        <p
+          className="text-xs text-muted-foreground italic break-words min-w-0 flex-1"
+          title={issue.originalText}
+        >
           &ldquo;{issue.originalText}&rdquo;
         </p>
         <Badge variant={severityVariant[issue.severity]} className="shrink-0 text-[10px]">
@@ -45,14 +48,14 @@ export function IssueCard({ issue }: IssueCardProps) {
 
       <Separator />
 
-      <div className="flex flex-col gap-1">
-        <p className="font-medium text-xs text-destructive">{issue.problem}</p>
-        <p className="text-xs text-muted-foreground">{issue.suggestion}</p>
+      <div className="flex flex-col gap-1 min-w-0">
+        <p className="font-medium text-xs text-destructive break-words">{issue.problem}</p>
+        <p className="text-xs text-muted-foreground break-words">{issue.suggestion}</p>
       </div>
 
       {issue.improvedText && (
-        <div className="rounded bg-muted px-2 py-1.5 flex items-start justify-between gap-2">
-          <p className="text-xs flex-1">{issue.improvedText}</p>
+        <div className="rounded bg-muted px-2 py-1.5 flex items-start justify-between gap-2 min-w-0">
+          <p className="text-xs flex-1 break-words min-w-0">{issue.improvedText}</p>
           <Button
             variant="ghost"
             size="icon"

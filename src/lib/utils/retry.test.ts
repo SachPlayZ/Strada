@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { withRetry } from './retry'
+import { withRetry, TimeoutError } from './retry'
 
 describe('withRetry', () => {
   it('returns the first successful result without retrying', async () => {
     const fn = vi.fn(async () => 'ok')
-    const out = await withRetry(fn, 3, 1)
+    const out = await withRetry(fn, { attempts: 3, baseMs: 1 })
     expect(out).toBe('ok')
     expect(fn).toHaveBeenCalledTimes(1)
   })
@@ -16,7 +16,7 @@ describe('withRetry', () => {
       if (calls < 3) throw new Error('transient')
       return 'recovered'
     })
-    const out = await withRetry(fn, 3, 1)
+    const out = await withRetry(fn, { attempts: 3, baseMs: 1 })
     expect(out).toBe('recovered')
     expect(fn).toHaveBeenCalledTimes(3)
   })
@@ -26,7 +26,7 @@ describe('withRetry', () => {
     const fn = vi.fn(async () => {
       throw err
     })
-    await expect(withRetry(fn, 3, 1)).rejects.toBe(err)
+    await expect(withRetry(fn, { attempts: 3, baseMs: 1 })).rejects.toBe(err)
     expect(fn).toHaveBeenCalledTimes(3)
   })
 
@@ -36,19 +36,38 @@ describe('withRetry', () => {
       const fn = vi.fn(async () => {
         throw new Error('x')
       })
-      const p = withRetry(fn, 3, 100).catch(() => {})
-      // First attempt runs sync; wait for microtasks to flush
+      const p = withRetry(fn, { attempts: 3, baseMs: 100, timeoutMs: 1_000_000 }).catch(() => {})
       await Promise.resolve()
       expect(fn).toHaveBeenCalledTimes(1)
-      // 1st backoff: 2^0 * 100 = 100ms
       await vi.advanceTimersByTimeAsync(100)
       expect(fn).toHaveBeenCalledTimes(2)
-      // 2nd backoff: 2^1 * 100 = 200ms
       await vi.advanceTimersByTimeAsync(200)
       expect(fn).toHaveBeenCalledTimes(3)
       await p
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('times out a stuck attempt and retries', async () => {
+    let callNo = 0
+    const fn = vi.fn(async () => {
+      callNo++
+      if (callNo === 1) await new Promise(() => {}) // hangs — should be aborted
+      return 'ok'
+    })
+    await expect(
+      withRetry(fn, { attempts: 2, baseMs: 1, timeoutMs: 20 }),
+    ).resolves.toBe('ok')
+    expect(fn).toHaveBeenCalledTimes(2)
+  })
+
+  it('throws TimeoutError when all attempts hang', async () => {
+    const fn = vi.fn(async () => {
+      await new Promise(() => {})
+    })
+    await expect(
+      withRetry(fn, { attempts: 2, baseMs: 1, timeoutMs: 15 }),
+    ).rejects.toBeInstanceOf(TimeoutError)
   })
 })

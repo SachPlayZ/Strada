@@ -46,6 +46,7 @@ interface ReportViewProps {
 export function ReportView({ report, extracted }: ReportViewProps) {
   const topIssues = report.issues.slice(0, 3)
   const estimated = new Set<Category>(report.meta.estimatedCategories ?? [])
+  const estimatedReasons = report.meta.estimatedReasons ?? {}
   const issuesByCategory = categoryOrder.reduce<Record<Category, typeof report.issues>>(
     (acc, cat) => {
       acc[cat] = report.issues.filter(i => i.category === cat)
@@ -55,10 +56,13 @@ export function ReportView({ report, extracted }: ReportViewProps) {
   )
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex flex-col gap-3 p-4 border-b">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs text-muted-foreground truncate min-w-0" title={report.meta.title}>
+    <div className="flex flex-col h-full min-w-0">
+      <div className="flex flex-col gap-3 p-4 border-b min-w-0">
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <p
+            className="text-xs text-muted-foreground truncate min-w-0 flex-1"
+            title={report.meta.title}
+          >
             {truncate(report.meta.title, 48)}
           </p>
           <span
@@ -68,7 +72,9 @@ export function ReportView({ report, extracted }: ReportViewProps) {
           </span>
         </div>
         <Progress value={report.overallScore} className="h-2" />
-        <p className="text-xs text-muted-foreground leading-relaxed">{report.summary}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed break-words">
+          {report.summary}
+        </p>
       </div>
 
       <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0">
@@ -88,15 +94,19 @@ export function ReportView({ report, extracted }: ReportViewProps) {
                   const score = report.categoryScores[cat] ?? 0
                   const isEstimated = estimated.has(cat)
                   return (
-                    <div key={cat} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
+                    <div key={cat} className="flex flex-col gap-1 min-w-0">
+                      <div className="flex items-center justify-between text-xs gap-2 min-w-0">
+                        <span className="text-muted-foreground flex items-center gap-1.5 min-w-0 flex-1 truncate">
                           {categoryLabels[cat]}
                           {isEstimated && (
                             <Badge
                               variant="outline"
-                              className="text-[9px] px-1 py-0 h-4 border-amber-500 text-amber-600"
-                              title="Category score is a fallback — the LLM call failed after retries."
+                              className="text-[9px] px-1 py-0 h-4 border-amber-500 text-amber-600 cursor-help"
+                              title={
+                                estimatedReasons[cat]
+                                  ? `Fallback score — LLM call failed: ${estimatedReasons[cat]}`
+                                  : 'Fallback score — the LLM call failed after retries.'
+                              }
                             >
                               Estimated
                             </Badge>

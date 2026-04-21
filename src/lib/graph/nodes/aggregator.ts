@@ -40,11 +40,20 @@ export async function aggregatorNode(
     Object.entries(nodes).map(([cat, result]) => [cat, result?.categoryScore ?? 50]),
   ) as Record<Category, number>
 
-  const estimatedCategories: Category[] = (
-    Object.entries(nodes) as [Category, NodeResult | undefined][]
-  )
-    .filter(([, r]) => !r || r.rationale === ESTIMATED_SENTINEL)
-    .map(([cat]) => cat)
+  const estimatedCategories: Category[] = []
+  const estimatedReasons: Partial<Record<Category, string>> = {}
+  for (const [cat, r] of Object.entries(nodes) as [Category, NodeResult | undefined][]) {
+    if (!r) {
+      estimatedCategories.push(cat)
+      estimatedReasons[cat] = 'Node did not run.'
+      continue
+    }
+    if (r.rationale.startsWith(ESTIMATED_SENTINEL)) {
+      estimatedCategories.push(cat)
+      const reason = r.rationale.slice(ESTIMATED_SENTINEL.length).trim()
+      estimatedReasons[cat] = reason.length > 0 ? reason : 'Unknown error.'
+    }
+  }
 
   const allIssues: Issue[] = Object.values(nodes).flatMap(r => r?.issues ?? [])
 
@@ -90,6 +99,7 @@ export async function aggregatorNode(
       analyzedAt: Date.now(),
       model: 'gemini-2.0-flash',
       estimatedCategories,
+      estimatedReasons,
     },
   }
 

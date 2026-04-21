@@ -13,6 +13,65 @@ export function extract(): ExtractedCopyInline {
     return s.replace(/\s+/g, ' ').trim()
   }
 
+  // Walks the element's subtree and concatenates text, inserting whitespace at <br> and
+  // block-level boundaries. `innerText` is unreliable here — some engines (incl. cases
+  // seen in content-script contexts) don't translate <br> to "\n" — so we do it ourselves.
+  // Real-world case: `<h1>Build AI Agents That<br><span>Convert & Engage</span></h1>`
+  // with no whitespace around the <br> must extract as "Build AI Agents That Convert & Engage".
+  const BLOCK_TAGS = new Set([
+    'ADDRESS',
+    'ARTICLE',
+    'ASIDE',
+    'BLOCKQUOTE',
+    'BR',
+    'DD',
+    'DIV',
+    'DL',
+    'DT',
+    'FIELDSET',
+    'FIGCAPTION',
+    'FIGURE',
+    'FOOTER',
+    'FORM',
+    'H1',
+    'H2',
+    'H3',
+    'H4',
+    'H5',
+    'H6',
+    'HEADER',
+    'HR',
+    'LI',
+    'MAIN',
+    'NAV',
+    'OL',
+    'P',
+    'PRE',
+    'SECTION',
+    'TABLE',
+    'TD',
+    'TH',
+    'TR',
+    'UL',
+  ])
+  function readText(el: Element): string {
+    const parts: string[] = []
+    const walk = (node: Node) => {
+      if (node.nodeType === 3) {
+        parts.push((node as Text).data)
+        return
+      }
+      if (node.nodeType !== 1) return
+      const tag = (node as Element).tagName
+      const isBlock = BLOCK_TAGS.has(tag)
+      if (isBlock) parts.push(' ')
+      for (const child of Array.from(node.childNodes)) walk(child)
+      if (isBlock) parts.push(' ')
+    }
+    walk(el)
+    return parts.join('')
+  }
+
   function isVisible(el: Element): boolean {
     const style = window.getComputedStyle(el)
     return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
@@ -23,7 +82,7 @@ export function extract(): ExtractedCopyInline {
   const headlinesSeen = new Set<string>()
   const headlines: string[] = []
   for (const el of headlineEls) {
-    const text = normalizeWS(el.textContent || '')
+    const text = normalizeWS(readText(el))
     if (text && !headlinesSeen.has(text)) {
       headlinesSeen.add(text)
       headlines.push(text)
@@ -41,7 +100,7 @@ export function extract(): ExtractedCopyInline {
   for (const el of ctaCandidates) {
     const tag = el.tagName.toLowerCase()
     const text = normalizeWS(
-      tag === 'input' ? (el as HTMLInputElement).value : el.textContent || '',
+      tag === 'input' ? (el as HTMLInputElement).value : readText(el),
     )
     if (!text) continue
     const isButton = tag === 'button' || tag === 'input' || el.getAttribute('role') === 'button'
@@ -57,13 +116,13 @@ export function extract(): ExtractedCopyInline {
   const valueProps: string[] = []
   const h1 = document.querySelector('h1')
   if (h1) {
-    const h1Text = normalizeWS(h1.textContent || '')
+    const h1Text = normalizeWS(readText(h1))
     if (h1Text) valueProps.push(h1Text)
 
     let sibling = h1.nextElementSibling
     while (sibling) {
       if (sibling.tagName.toLowerCase() === 'p') {
-        const t = normalizeWS(sibling.textContent || '')
+        const t = normalizeWS(readText(sibling))
         if (t) {
           valueProps.push(t)
           break
@@ -84,7 +143,7 @@ export function extract(): ExtractedCopyInline {
   for (const p of paragraphs) {
     if (p.closest(excludedSelectors)) continue
     if (!isVisible(p)) continue
-    const text = normalizeWS(p.textContent || '')
+    const text = normalizeWS(readText(p))
     if (text.length > 40) bodyParts.push(text)
   }
   const rawBody = bodyParts.join('\n\n')

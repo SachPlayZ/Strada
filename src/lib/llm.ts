@@ -7,8 +7,7 @@ export function createLLM(): ChatGoogleGenerativeAI {
     throw new Error('VITE_GEMINI_API_KEY is not set. Add it to .env.local.')
   }
   return new ChatGoogleGenerativeAI({
-    model: 'gemini-2.0-flash',
-    temperature: 0.2,
+    model: 'gemini-3-flash-preview',
     apiKey,
   })
 }

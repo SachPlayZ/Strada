@@ -5,7 +5,10 @@ import { clamp } from '../../utils/scoring'
 import { withRetry, ESTIMATED_SENTINEL } from '../../utils/retry'
 import type { AnalysisStateType } from '../state'
 
-const FALLBACK = { issues: [], categoryScore: 50, rationale: ESTIMATED_SENTINEL }
+function fallback(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err)
+  return { issues: [], categoryScore: 50, rationale: `${ESTIMATED_SENTINEL}${msg}` }
+}
 
 function gradeToScore(grade: number): number {
   // Grade 6 or below = 100, grade 16+ = 0; linear in between
@@ -56,14 +59,15 @@ Return a JSON with:
 - categoryScore: ${computedScore} (use this computed score, adjust ±10 based on qualitative assessment)
 - rationale: mention the FK grade level and what it means for the target audience`
 
-    const result = await withRetry(() => chain.invoke(prompt))
+    const result = await withRetry(() => chain.invoke(prompt), { label: 'readability' })
     const clampedScore = clamp(
       result.categoryScore,
       Math.max(0, computedScore - 10),
       Math.min(100, computedScore + 10),
     )
     return { readability: { ...result, categoryScore: clampedScore } }
-  } catch {
-    return { readability: FALLBACK }
+  } catch (err) {
+    console.error('[Strada/readability] failed:', err)
+    return { readability: fallback(err) }
   }
 }

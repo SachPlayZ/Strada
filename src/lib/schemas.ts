@@ -43,5 +43,8 @@ export const AnalysisReportSchema = z.object({
     analyzedAt: z.number(),
     model: z.string(),
     estimatedCategories: z.array(z.enum(['value_prop', 'cta', 'jargon', 'tone', 'readability'])),
+    estimatedReasons: z
+      .partialRecord(z.enum(['value_prop', 'cta', 'jargon', 'tone', 'readability']), z.string())
+      .optional(),
   }),
 })
