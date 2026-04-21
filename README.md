@@ -1,6 +1,6 @@
 # Strada — AI Copy Analyzer
 
-Strada is a Chrome MV3 extension that extracts copy from any webpage and runs it through a parallel LangGraph pipeline powered by Gemini 2.0 Flash. It scores five dimensions of copy quality — value proposition, CTAs, jargon, tone, and readability — and surfaces actionable issues with suggested rewrites directly in the extension popup.
+Strada is a Chrome MV3 extension that extracts copy from any webpage and runs it through a parallel LangGraph pipeline powered by Gemini 3.0 Flash Preview. It scores five dimensions of copy quality — value proposition, CTAs, jargon, tone, and readability — and surfaces actionable issues with suggested rewrites directly in the extension popup.
 
 ## Architecture
 
@@ -38,10 +38,9 @@ flowchart LR
 - **shadcn/ui only** — no custom component CSS; Tailwind utilities + Radix primitives throughout
 
 ## Screenshots
+
 <img width="423" height="602" alt="image" src="https://github.com/user-attachments/assets/b0e9c6cd-28db-4fe5-a83a-eb25db4bd93c" />
 <img width="1710" height="1034" alt="image" src="https://github.com/user-attachments/assets/19067c5c-1f7d-4625-aaac-8242744dfaaf" />
-<img width="1710" height="1033" alt="image" src="https://github.com/user-attachments/assets/3c170032-1e21-4e11-806b-eae613280df1" />
-
 
 ## Prerequisites
 
@@ -74,22 +73,22 @@ CRXJS serves the extension with hot module replacement. Load `dist/` once; subse
 
 ## Scripts
 
-| Script | What it does |
-|---|---|
-| `pnpm dev` | Start Vite dev server with CRXJS HMR |
-| `pnpm build` | TypeScript check + production build → `dist/` |
-| `pnpm typecheck` | `tsc --noEmit` only |
-| `pnpm test` | Run unit tests with Vitest |
-| `pnpm lint` | ESLint on `src` (zero warnings allowed) |
-| `pnpm format` | Prettier write on `src` |
+| Script           | What it does                                  |
+| ---------------- | --------------------------------------------- |
+| `pnpm dev`       | Start Vite dev server with CRXJS HMR          |
+| `pnpm build`     | TypeScript check + production build → `dist/` |
+| `pnpm typecheck` | `tsc --noEmit` only                           |
+| `pnpm test`      | Run unit tests with Vitest                    |
+| `pnpm lint`      | ESLint on `src` (zero warnings allowed)       |
+| `pnpm format`    | Prettier write on `src`                       |
 
 ## Design Decisions
 
 Three decisions worth calling out — full rationale (trade-offs, alternatives, production concerns) lives in [`NOTES.md`](./NOTES.md):
 
-- **Parallel LangGraph over a sequential chain.** The five analysis nodes share no data dependencies, so they fan out from `START` and fan in at the aggregator. Total latency tracks the slowest node (~2s) instead of the sum of five sequential Gemini calls. See [*LangGraph fan-out / fan-in*](./NOTES.md#langgraph-fan-out--fan-in).
-- **Hybrid local + LLM readability scoring.** Flesch-Kincaid is computed deterministically in the browser, then passed to the LLM as an anchor and clamped to ±10. Stops the model from hallucinating a score while still letting it flag jargon-dense-but-short-sentence copy. See [*Readability: hybrid local + LLM*](./NOTES.md#readability-hybrid-local--llm).
-- **Zod schemas at every trust boundary.** DOM extraction output and every LLM node result are validated with `safeParse`. Validation failures map to typed error codes (`RESTRICTED`, `NO_COPY`, `LLM_ERROR`, `MISSING_KEY`) instead of crashing the popup. See [*Zod schemas at runtime boundaries*](./NOTES.md#zod-schemas-at-runtime-boundaries).
+- **Parallel LangGraph over a sequential chain.** The five analysis nodes share no data dependencies, so they fan out from `START` and fan in at the aggregator. Total latency tracks the slowest node (~2s) instead of the sum of five sequential Gemini calls. See [_LangGraph fan-out / fan-in_](./NOTES.md#langgraph-fan-out--fan-in).
+- **Hybrid local + LLM readability scoring.** Flesch-Kincaid is computed deterministically in the browser, then passed to the LLM as an anchor and clamped to ±10. Stops the model from hallucinating a score while still letting it flag jargon-dense-but-short-sentence copy. See [_Readability: hybrid local + LLM_](./NOTES.md#readability-hybrid-local--llm).
+- **Zod schemas at every trust boundary.** DOM extraction output and every LLM node result are validated with `safeParse`. Validation failures map to typed error codes (`RESTRICTED`, `NO_COPY`, `LLM_ERROR`, `MISSING_KEY`) instead of crashing the popup. See [_Zod schemas at runtime boundaries_](./NOTES.md#zod-schemas-at-runtime-boundaries).
 
 ## AI Transparency
 
