@@ -21,5 +21,4 @@ export function severityRank(s: Severity): number {
   return s === 'high' ? 0 : s === 'medium' ? 1 : 2
 }
 
-export const clamp = (n: number, lo: number, hi: number): number =>
-  Math.min(hi, Math.max(lo, n))
+export const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n))

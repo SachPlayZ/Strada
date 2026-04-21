@@ -13,7 +13,7 @@ type AppState =
   | { status: 'done'; report: AnalysisReport; extracted: ExtractedCopy }
 
 export default function App() {
-  const [state, setState] = useState<AppState>({ status: 'idle' })
+  const [state, setState] = useState<AppState>({ status: 'loading' })
 
   useEffect(() => {
     const onProgress = (msg: BgMessage) => {
@@ -26,8 +26,7 @@ export default function App() {
     return () => chrome.runtime.onMessage.removeListener(onProgress)
   }, [])
 
-  const analyze = useCallback(() => {
-    setState({ status: 'loading' })
+  const requestAnalysis = useCallback(() => {
     chrome.runtime.sendMessage({ type: 'ANALYZE_PAGE' }, response => {
       if (chrome.runtime.lastError) {
         setState({
@@ -57,9 +56,14 @@ export default function App() {
     })
   }, [])
 
+  const analyze = useCallback(() => {
+    setState({ status: 'loading' })
+    requestAnalysis()
+  }, [requestAnalysis])
+
   useEffect(() => {
-    analyze()
-  }, [analyze])
+    requestAnalysis()
+  }, [requestAnalysis])
 
   return (
     <div className="w-[420px] max-h-[600px] overflow-hidden bg-background text-foreground flex flex-col">

@@ -125,6 +125,6 @@ describe('dedupeIssues', () => {
     ]
     const out = dedupeIssues(issues)
     expect(out).toHaveLength(2)
-    expect(out.map(i => i.id).sort()).toEqual(['1', '3'])
+    expect(out.map((i: Issue) => i.id).sort()).toEqual(['1', '3'])
   })
 })
