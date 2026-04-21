@@ -8,8 +8,8 @@ flowchart LR
     popup -->|ANALYZE_PAGE| bg[Background SW]
     bg -->|chrome.scripting.executeScript| cs[Content extractor]
     cs -->|ExtractedCopy| bg
-    bg --> graph[LangGraph StateGraph]
-    subgraph graph [LangGraph]
+    bg --> pipeline[LangGraph StateGraph]
+    subgraph pipeline [LangGraph]
         startNode((start)) --> vp[valueProp]
         startNode --> cta[cta]
         startNode --> jrg[jargon]
@@ -21,7 +21,7 @@ flowchart LR
         tone --> agg
         readNode --> agg
     end
-    graph -->|AnalysisReport| bg
+    pipeline -->|AnalysisReport| bg
     bg -->|report| popup
     popup --> ui[shadcn Report UI]
 ```
@@ -110,4 +110,4 @@ pnpm dev
 
 ## AI Tools Used
 
-All code was written with AI assistance via Cursor (Claude Opus 4.7). Full chat transcript: [`AI_CHAT_HISTORY/strada-build-claude-opus.md`](./AI_CHAT_HISTORY/strada-build-claude-opus.md).
+Code written with AI assistance via Cursor (Claude Opus 4.7) for Planning and Claude Code (Claude Sonnet 4.6) for Tasks 1-7. Full chat transcript: [`chat-history.txt`](./chat-history.txt).
