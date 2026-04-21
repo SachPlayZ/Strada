@@ -214,12 +214,13 @@ async function runAnalysis(): Promise<BgResponse> {
       }
     }
 
-    const validated = AnalysisReportSchema.safeParse(
-      (finalState as { report?: unknown }).report,
-    )
+    const validated = AnalysisReportSchema.safeParse((finalState as { report?: unknown }).report)
     if (!validated.success) {
       console.error('[Strada/validate] report schema mismatch:', validated.error.issues)
-      console.error('[Strada/validate] received report:', (finalState as { report?: unknown }).report)
+      console.error(
+        '[Strada/validate] received report:',
+        (finalState as { report?: unknown }).report,
+      )
       const firstIssue = validated.error.issues[0]
       const where = firstIssue?.path.join('.') || '(root)'
       return {
@@ -272,9 +273,7 @@ chrome.runtime.onMessage.addListener((message: BgMessage, _sender, sendResponse)
   if (message.type === 'GET_TAB_INFO') {
     getActiveTabInfo()
       .then(sendResponse)
-      .catch(err =>
-        sendResponse({ ok: false, message: String(err) } as TabInfoResponse),
-      )
+      .catch(err => sendResponse({ ok: false, message: String(err) } as TabInfoResponse))
     return true
   }
 

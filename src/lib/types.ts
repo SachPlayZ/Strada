@@ -59,10 +59,7 @@ export type TabInfo = {
   restricted: boolean
 }
 
-export type BgMessage =
-  | { type: 'ANALYZE_PAGE' }
-  | { type: 'GET_TAB_INFO' }
-  | Progress
+export type BgMessage = { type: 'ANALYZE_PAGE' } | { type: 'GET_TAB_INFO' } | Progress
 
 export type BgResponse =
   | { ok: true; report: AnalysisReport; extracted: ExtractedCopy }
@@ -72,6 +69,4 @@ export type BgResponse =
       message: string
     }
 
-export type TabInfoResponse =
-  | { ok: true; tab: TabInfo }
-  | { ok: false; message: string }
+export type TabInfoResponse = { ok: true; tab: TabInfo } | { ok: false; message: string }

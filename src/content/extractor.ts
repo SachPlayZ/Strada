@@ -99,9 +99,7 @@ export function extract(): ExtractedCopyInline {
   const ctas: string[] = []
   for (const el of ctaCandidates) {
     const tag = el.tagName.toLowerCase()
-    const text = normalizeWS(
-      tag === 'input' ? (el as HTMLInputElement).value : readText(el),
-    )
+    const text = normalizeWS(tag === 'input' ? (el as HTMLInputElement).value : readText(el))
     if (!text) continue
     const isButton = tag === 'button' || tag === 'input' || el.getAttribute('role') === 'button'
     const isActionLink = tag === 'a' && actionVerbRe.test(text)

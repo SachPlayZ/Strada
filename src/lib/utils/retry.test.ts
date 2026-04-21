@@ -56,9 +56,7 @@ describe('withRetry', () => {
       if (callNo === 1) await new Promise(() => {}) // hangs — should be aborted
       return 'ok'
     })
-    await expect(
-      withRetry(fn, { attempts: 2, baseMs: 1, timeoutMs: 20 }),
-    ).resolves.toBe('ok')
+    await expect(withRetry(fn, { attempts: 2, baseMs: 1, timeoutMs: 20 })).resolves.toBe('ok')
     expect(fn).toHaveBeenCalledTimes(2)
   })
 
@@ -66,8 +64,8 @@ describe('withRetry', () => {
     const fn = vi.fn(async () => {
       await new Promise(() => {})
     })
-    await expect(
-      withRetry(fn, { attempts: 2, baseMs: 1, timeoutMs: 15 }),
-    ).rejects.toBeInstanceOf(TimeoutError)
+    await expect(withRetry(fn, { attempts: 2, baseMs: 1, timeoutMs: 15 })).rejects.toBeInstanceOf(
+      TimeoutError,
+    )
   })
 })
