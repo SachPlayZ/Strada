@@ -45,12 +45,34 @@ export interface AnalysisReport {
 
 export type ProgressStage = 'extracting' | 'analyzing' | 'aggregating' | 'done'
 
-export type Progress = {
-  type: 'PROGRESS'
+export type AnalysisStatus = 'idle' | 'running' | 'complete' | 'error'
+
+export type ErrorCode = 'RESTRICTED' | 'NO_COPY' | 'LLM_ERROR' | 'MISSING_KEY' | 'UNKNOWN'
+
+export interface AnalysisError {
+  code: ErrorCode
+  message: string
+}
+
+/**
+ * Single source of truth for the analysis lifecycle. Stored in
+ * `chrome.storage.session` so the popup can reconstruct UI state on reopen
+ * without the background service worker needing to be awake.
+ */
+export interface AnalysisSnapshot {
+  status: AnalysisStatus
   stage: ProgressStage
   percent: number
   detail: string
   completed: Category[]
+  partial: Partial<Record<Category, NodeResult>>
+  extracted?: ExtractedCopy
+  report?: AnalysisReport
+  error?: AnalysisError
+  url?: string
+  title?: string
+  startedAt?: number
+  updatedAt: number
 }
 
 export type TabInfo = {
@@ -59,14 +81,12 @@ export type TabInfo = {
   restricted: boolean
 }
 
-export type BgMessage = { type: 'ANALYZE_PAGE' } | { type: 'GET_TAB_INFO' } | Progress
+/** Messages sent from popup → background over the named port. */
+export type PortInbound = { type: 'GET_TAB_INFO' } | { type: 'ANALYZE_PAGE' } | { type: 'RESET' }
 
-export type BgResponse =
-  | { ok: true; report: AnalysisReport; extracted: ExtractedCopy }
-  | {
-      ok: false
-      code: 'RESTRICTED' | 'NO_COPY' | 'LLM_ERROR' | 'MISSING_KEY' | 'UNKNOWN'
-      message: string
-    }
+/** Messages sent from background → popup over the named port. */
+export type PortOutbound =
+  | { type: 'SNAPSHOT'; snapshot: AnalysisSnapshot }
+  | { type: 'TAB_INFO'; tab: TabInfo | null; error?: string }
 
-export type TabInfoResponse = { ok: true; tab: TabInfo } | { ok: false; message: string }
+export const PORT_NAME = 'strada'

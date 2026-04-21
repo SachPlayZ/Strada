@@ -1,11 +1,15 @@
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Sparkles, Globe, ShieldOff } from 'lucide-react'
+import { Sparkles, Globe, ShieldOff, ArrowRight } from 'lucide-react'
 import type { TabInfo } from '@/lib/types'
+import { ThemeToggle } from './ThemeToggle'
+import type { Theme } from '../hooks/useTheme'
 
 interface IntroViewProps {
   tab: TabInfo | null
   onAnalyze: () => void
+  theme: Theme
+  onToggleTheme: () => void
 }
 
 function hostOf(url: string): string {
@@ -16,17 +20,25 @@ function hostOf(url: string): string {
   }
 }
 
-export function IntroView({ tab, onAnalyze }: IntroViewProps) {
+export function IntroView({ tab, onAnalyze, theme, onToggleTheme }: IntroViewProps) {
   const restricted = tab?.restricted ?? false
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-4 p-4 animate-fade-in-up">
       <div className="flex items-center gap-2">
-        <Sparkles className="size-5 text-primary" />
-        <h1 className="text-base font-semibold">Strada</h1>
+        <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Sparkles className="size-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base font-semibold leading-tight">Strada</h1>
+          <p className="text-[11px] text-muted-foreground leading-tight">
+            AI copy analyzer for any page
+          </p>
+        </div>
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
 
-      <div className="rounded-lg border bg-muted/30 p-3 flex gap-3">
+      <div className="rounded-xl border bg-muted/30 p-3 flex gap-3">
         <Globe className="size-4 mt-0.5 text-muted-foreground shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate" title={tab?.title}>
@@ -53,8 +65,15 @@ export function IntroView({ tab, onAnalyze }: IntroViewProps) {
             Analyze this page's copy across value proposition, CTAs, jargon, tone, and readability.
             Takes ~2–5 seconds.
           </p>
-          <Button className="w-full" onClick={onAnalyze} disabled={!tab}>
-            {tab ? 'Analyze this page' : 'Loading…'}
+          <Button className="w-full group" onClick={onAnalyze} disabled={!tab}>
+            {tab ? (
+              <>
+                Analyze this page
+                <ArrowRight className="ml-1 size-4 transition-transform group-hover:translate-x-0.5" />
+              </>
+            ) : (
+              'Loading…'
+            )}
           </Button>
         </>
       )}

@@ -22,10 +22,9 @@ status: completed
 - id: task-6-popup-ui  
 content: "Task 6 — Popup UI: shadcn-only components for report, loading skeleton, empty/error states"  
 status: completed
-- id: task-7-docs-delivery
-content: "Task 7 — Docs & delivery: README.md, NOTES.md, AI_CHAT_HISTORY/, git init + GitHub push"
-status: pending
-isProject: false
+- id: task-7-docs-delivery  
+content: "Task 7 — Docs & delivery: README.md, NOTES.md, AI_CHAT_HISTORY/, git init + GitHub push"  
+status: completed
 
 ---
 

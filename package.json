@@ -13,7 +13,22 @@
     "test:ui": "vitest --ui",
     "lint": "eslint src --max-warnings=0",
     "format": "prettier --write src",
-    "format:check": "prettier --check src"
+    "format:check": "prettier --check src",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "verify:fix": "pnpm format && pnpm lint --fix && pnpm typecheck && pnpm test && pnpm build",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0"
+    ],
+    "src/**/*.{js,jsx,json,css,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@langchain/core": "^1.1.40",
@@ -25,7 +40,8 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "simple-git-hooks"
     ]
   },
   "devDependencies": {
@@ -53,9 +69,11 @@
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "happy-dom": "^20.9.0",
+    "lint-staged": "^16.4.0",
     "lucide-react": "^0.468.0",
     "postcss": "^8.4.49",
     "prettier": "^3.8.3",
+    "simple-git-hooks": "^2.13.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",

@@ -9,7 +9,10 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Separator } from '@/components/ui/separator'
+import { Sparkles } from 'lucide-react'
 import { IssueCard } from './IssueCard'
+import { ThemeToggle } from './ThemeToggle'
+import type { Theme } from '../hooks/useTheme'
 import type { AnalysisReport, Category, ExtractedCopy } from '@/lib/types'
 
 const categoryLabels: Record<Category, string> = {
@@ -41,9 +44,11 @@ function truncate(str: string, max: number) {
 interface ReportViewProps {
   report: AnalysisReport
   extracted: ExtractedCopy
+  theme: Theme
+  onToggleTheme: () => void
 }
 
-export function ReportView({ report, extracted }: ReportViewProps) {
+export function ReportView({ report, extracted, theme, onToggleTheme }: ReportViewProps) {
   const topIssues = report.issues.slice(0, 3)
   const estimated = new Set<Category>(report.meta.estimatedCategories ?? [])
   const estimatedReasons = report.meta.estimatedReasons ?? {}
@@ -56,20 +61,32 @@ export function ReportView({ report, extracted }: ReportViewProps) {
   )
 
   return (
-    <div className="flex flex-col h-full min-w-0">
+    <div className="flex flex-col h-[600px] min-w-0 animate-fade-in-up">
       <div className="flex flex-col gap-3 p-4 border-b min-w-0">
-        <div className="flex items-start justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Sparkles className="size-3" />
+          </span>
           <p
             className="text-xs text-muted-foreground truncate min-w-0 flex-1"
             title={report.meta.title}
           >
             {truncate(report.meta.title, 48)}
           </p>
-          <span
-            className={`text-3xl font-bold tabular-nums shrink-0 ${scoreColor(report.overallScore)}`}
-          >
-            {report.overallScore}
-          </span>
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+        </div>
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Overall score
+            </p>
+            <p
+              className={`text-4xl font-bold tabular-nums leading-none ${scoreColor(report.overallScore)}`}
+            >
+              {report.overallScore}
+              <span className="text-sm text-muted-foreground font-normal">/100</span>
+            </p>
+          </div>
         </div>
         <Progress value={report.overallScore} className="h-2" />
         <p className="text-xs text-muted-foreground leading-relaxed break-words">
@@ -86,8 +103,8 @@ export function ReportView({ report, extracted }: ReportViewProps) {
           <TabsTrigger value="copy">Extracted</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex-1 min-h-0 mt-0">
-          <ScrollArea className="h-[340px]">
+        <TabsContent value="overview" className="flex-1 min-h-0 mt-0 overflow-hidden">
+          <ScrollArea className="h-full">
             <div className="flex flex-col gap-4 p-4">
               <div className="flex flex-col gap-2">
                 {categoryOrder.map(cat => {
@@ -137,8 +154,8 @@ export function ReportView({ report, extracted }: ReportViewProps) {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="issues" className="flex-1 min-h-0 mt-0">
-          <ScrollArea className="h-[340px]">
+        <TabsContent value="issues" className="flex-1 min-h-0 mt-0 overflow-hidden">
+          <ScrollArea className="h-full">
             <div className="p-4">
               {report.issues.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No issues found.</p>
@@ -173,8 +190,8 @@ export function ReportView({ report, extracted }: ReportViewProps) {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="copy" className="flex-1 min-h-0 mt-0">
-          <ScrollArea className="h-[340px]">
+        <TabsContent value="copy" className="flex-1 min-h-0 mt-0 overflow-hidden">
+          <ScrollArea className="h-full">
             <div className="p-4">
               <Accordion
                 type="multiple"

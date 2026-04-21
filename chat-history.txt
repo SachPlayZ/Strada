@@ -1155,3 +1155,184 @@ breaks the PR.
 USER: append to chat history
 
 A: Appended this turn (test suite + CI/lint wiring) to chat-history.txt.
+
+---
+
+USER: Improve the UI further
+- Include a dark/light mode switch
+- Line animations and progress animations while nodes are being generated
+- Add a "Preparing report" state at the end — after all 5 nodes done, show the
+  user the report is being generated
+
+A: Surveyed popup tree — src/popup/App.tsx, src/popup/components/*, src/popup/
+index.css (already had .dark CSS vars from shadcn init), tailwind.config.js,
+manifest.json, src/background/index.ts (to confirm progress stages: extracting /
+analyzing / aggregating / done, with PROGRESS messages carrying stage, percent,
+detail, completed:Category[]).
+
+Added tailwind keyframes + animations (tailwind.config.js):
+- shimmer (2.2s linear infinite) — moving highlight across progress bar
+- dash-flow (1.2s linear infinite) — SVG strokeDashoffset flow along connector
+- pulse-glow (1.6s ease-out infinite) — box-shadow halo on active nodes
+- fade-in-up, slide-in-right — for row/detail enter transitions
+- float, spin-slow — misc utility
+No new CSS files; all animations live in the tailwind config (shadcn theme-vars
+rule preserved — per CLAUDE.md: only @tailwind directives + shadcn vars).
+
+Dark mode — three-file addition:
+- src/popup/hooks/useTheme.ts: reads chrome.storage.local['strada:theme'] on
+  mount, falls back to prefers-color-scheme for first-paint, applies .dark class
+  on document.documentElement + colorScheme style. Returns { theme, toggleTheme }
+- src/popup/components/ThemeToggle.tsx: shadcn ghost Button with cross-fading
+  Sun/Moon icons (rotate + scale + opacity transitions, 300ms)
+- Wired into IntroView header and ReportView header; both components now take
+  { theme, onToggleTheme } props, App.tsx passes from useTheme()
+
+Rewrote src/popup/components/LoadingState.tsx around a node-graph visualization:
+- Header: pulse-glow Sparkles badge, stage-aware title/subtitle, right-aligned %
+- Progress bar: base primary fill + overlaid shimmer gradient that hides at 0/100
+- Detail line: keyed re-mount triggers slide-in-right on each new detail string
+- NodeGraph: Extract copy (top step) → 5 NodePills for value_prop/cta/jargon/
+  tone/readability (fade-in-up staggered 60ms) → Aggregate & score (bottom step).
+  Left-side SVG draws a static border line + overlaid strokeDasharray='4 6' line
+  with animate-dash-flow showing "flow" while anyRunning || allNodesDone
+- StatusDot: dashed grey (pending) → primary/15 + Loader2 spin (running) → solid
+  primary + Check (done, fade-in-up)
+
+"Preparing report" state (PreparingReportCard in LoadingState.tsx):
+- Shown when stage==='aggregating' OR stage==='done' OR (stage==='analyzing' &&
+  allNodesDone) — covers the small gap between last analyzer finishing and
+  aggregator_node emitting
+- Primary-tinted bordered card with shimmer sheen overlay (disabled at done)
+- Three copy variants: "Finishing up analyzers" (waiting on last node),
+  "Preparing your report" (all 5 done, aggregator working), "Report ready" (done)
+- Icon swaps FileText → Check when isDone; spinner hides at done
+
+Polish on IntroView/ReportView:
+- IntroView: Sparkles badge + "AI copy analyzer for any page" subtitle, Analyze
+  button gained ArrowRight icon with group-hover translate-x-0.5
+- ReportView: header row = badge + truncated title + ThemeToggle, dedicated
+  "Overall score /100" block below with 4xl tabular-nums
+
+Verified: pnpm tsc --noEmit clean, pnpm build clean (dist/~866kB gzip 237kB,
+unchanged structure). No new linter errors.
+
+---
+
+USER: Architecture refactor — popup must never own the analysis
+- Popup = pure UI shell reflecting state the background holds
+- chrome.storage.session is source of truth (nodes completed, partial results,
+  status idle/running/complete/error, timestamp)
+- chrome.runtime.connect named port for live updates; each node completion
+  writes to storage AND posts to port if open; null port = skip, no retries
+- Per-node storage writes double as SW keep-alive heartbeats (Chrome suspends
+  after ~30s of silent inactivity)
+- LangGraph parallel nodes → aggregator; each node writes its result to
+  storage as soon as done so popup shows incremental progress
+- On mount, popup reads chrome.storage.session FIRST and renders, before
+  anything else
+
+A: Reviewed existing wiring: background used one-off sendMessage with
+sendResponse callback + broadcast PROGRESS messages (lost whenever popup was
+closed). Refactored to the storage+port contract across 4 files.
+
+Types — src/lib/types.ts:
+- Added AnalysisStatus = 'idle'|'running'|'complete'|'error'
+- Added AnalysisError { code:ErrorCode; message:string }
+- Added AnalysisSnapshot — the persisted blob:
+    status, stage, percent, detail, completed:Category[],
+    partial:Partial<Record<Category, NodeResult>>,
+    extracted?, report?, error?, url?, title?, startedAt?, updatedAt
+- Added PortInbound (popup→bg): GET_TAB_INFO | ANALYZE_PAGE | RESET
+- Added PortOutbound (bg→popup): SNAPSHOT{snapshot} | TAB_INFO{tab,error?}
+- Exported PORT_NAME = 'strada' (single constant, imported on both sides)
+- Removed legacy Progress / BgMessage / BgResponse / TabInfoResponse types
+
+Storage helpers — src/lib/session.ts (new):
+- SESSION_KEY = 'strada:analysis' (singleton; url field distinguishes runs)
+- makeIdleSnapshot(): clean default with updatedAt
+- readSnapshot(): graceful fallback to idle if chrome.storage.session missing
+  (popup tests, dev preview)
+- writeSnapshot(s): full replace — used once per run at start to clear stale
+  partials without merge semantics
+- updateSnapshot(patch): read/merge/write; completed + partial merged not
+  replaced when patch omits them; stamps updatedAt; returns new snapshot so
+  callers can fan-out broadcast
+- clearSnapshot(): write idle, return it
+- markNodeComplete(snapshot, cat, result): helper for per-node merges
+
+Background rewrite — src/background/index.ts:
+- Port registry: Set<chrome.runtime.Port>. onConnect filters name===PORT_NAME,
+  adds to set, wires onDisconnect cleanup + onMessage → handleInbound,
+  immediately posts current readSnapshot() to the new port (authoritative
+  state on connect even if popup's own storage read lost a race)
+- broadcast(msg): try/catch posts to every port; stale/disconnected ports get
+  removed silently — no retries, no errors bubble
+- persist(patch) = updateSnapshot(patch) + broadcast({type:'SNAPSHOT',...})
+- activeRun: Promise<void>|null — second ANALYZE_PAGE while one is in flight
+  returns the same promise; guarantees single-flight per SW lifetime
+- runAnalysis rewritten as void-returning, side-effect only:
+  * writeSnapshot(seed) at start (full replace, clears prior partials, stamps
+    url/title/startedAt, status='running')
+  * persist() after extraction, preflight, and every streamed node chunk
+  * streamMode:'updates' loop — for each node key, look up NODE_LABELS[key]
+    → { category, label, channel }, pull NodeResult from partial state via
+    meta.channel, stash into partial[meta.category], append to completed,
+    percent ramps 15→85 across 5 nodes, aggregator hits 92 separately
+  * On cache hit: persist a complete snapshot too, so popup UX is identical
+    whether cache or fresh run
+  * Terminal states (complete/error) persisted — popup reopened after SW
+    suspension still sees final outcome
+  * failRun(code, msg) centralizes error persistence (status='error',
+    stage='done', percent=100, error:{code,message})
+- handleInbound routing:
+  * GET_TAB_INFO → posts TAB_INFO to the specific port that asked (not
+    broadcast — it's a per-client query)
+  * ANALYZE_PAGE → void startAnalysis() (fire-and-forget; updates arrive via
+    broadcast)
+  * RESET → refuses to clobber a live run (if activeRun: no-op); else
+    clearSnapshot() + broadcast. Popup's "back from empty state" / implicit
+    reset hooks route here
+
+Popup rewrite — src/popup/App.tsx:
+- Removed chrome.runtime.sendMessage + chrome.runtime.onMessage listener
+- State: snapshot:AnalysisSnapshot|null (null === not hydrated yet) + tab
+- Mount effect sequence (explicit comments in file): (1) readSnapshot() →
+  setSnapshot; (2) chrome.runtime.connect({name:PORT_NAME}) saved to portRef,
+  attach onMessage listener (SNAPSHOT → setSnapshot, TAB_INFO → setTab) +
+  onDisconnect cleanup; (3) post GET_TAB_INFO
+- Cleanup: removes listener, port.disconnect() in try/catch, nulls portRef
+- Render gate: if snapshot===null, render neutral 420×180 bg-background frame
+  with aria-busy — no flash of intro over an in-flight analysis
+- effectiveStatus = useMemo: if tab && snapshot.url && snapshot.url !== tab.url
+  → 'idle' (stale snapshot from a different tab; user switched pages)
+- Routing: idle → IntroView; running → LoadingState; error w/ code='NO_COPY' →
+  EmptyState (onBack → reset sends RESET); other error → ErrorState (onRetry
+  → analyze sends ANALYZE_PAGE); complete + report + extracted → ReportView;
+  fallback (complete but report missing) → IntroView
+- All control actions go over the port via send(msg:PortInbound)
+
+Manifest: no changes. 'storage' permission already covers chrome.storage.session.
+chrome.storage.local content-hash cache (10-min TTL) left untouched — it's
+orthogonal to the session progress snapshot.
+
+Verified: pnpm tsc --noEmit clean, pnpm build clean, no new linter errors.
+
+Flows exercised mentally:
+- Cold open → reads idle → Intro → Analyze → port opens → bg persists+
+  broadcasts each node → popup live-updates
+- Popup closes mid-run → port disconnects, ports set shrinks, bg keeps writing
+  snapshots silently (no post errors)
+- Popup reopens mid-run → storage.session read shows current stage/percent/
+  completed/partial immediately; port reconnect triggers bg's onConnect which
+  posts latest snapshot anyway (belt + suspenders)
+- Popup opens after SW suspended post-completion → terminal snapshot in
+  session storage; ReportView renders directly, no network
+- User switches tabs, reopens → snapshot.url !== tab.url → Intro for new tab
+
+---
+
+USER: append to chat history
+
+A: Appended this turn (UI polish + storage/port architecture refactor) to
+chat-history.txt.
