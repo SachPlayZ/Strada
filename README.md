@@ -37,6 +37,12 @@ flowchart LR
 - **Typed error codes** — `RESTRICTED`, `NO_COPY`, `LLM_ERROR`, `MISSING_KEY` surfaced in the popup UI
 - **shadcn/ui only** — no custom component CSS; Tailwind utilities + Radix primitives throughout
 
+## Screenshots
+<img width="423" height="602" alt="image" src="https://github.com/user-attachments/assets/b0e9c6cd-28db-4fe5-a83a-eb25db4bd93c" />
+<img width="1710" height="1034" alt="image" src="https://github.com/user-attachments/assets/19067c5c-1f7d-4625-aaac-8242744dfaaf" />
+<img width="1710" height="1033" alt="image" src="https://github.com/user-attachments/assets/3c170032-1e21-4e11-806b-eae613280df1" />
+
+
 ## Prerequisites
 
 - Node ≥ 20
