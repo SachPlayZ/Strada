@@ -1,6 +1,6 @@
 import type { Category, Severity } from '../types'
 
-const WEIGHTS: Record<Category, number> = {
+export const WEIGHTS: Record<Category, number> = {
   value_prop: 0.3,
   cta: 0.25,
   readability: 0.2,
@@ -20,3 +20,6 @@ export function weightedOverall(categoryScores: Record<Category, number>): numbe
 export function severityRank(s: Severity): number {
   return s === 'high' ? 0 : s === 'medium' ? 1 : 2
 }
+
+export const clamp = (n: number, lo: number, hi: number): number =>
+  Math.min(hi, Math.max(lo, n))

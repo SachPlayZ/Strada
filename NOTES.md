@@ -88,7 +88,7 @@ pnpm dev
 
 **LLM retries and partial results** — Currently a node failure returns a fixed fallback `{ issues: [], categoryScore: 50, rationale: 'unavailable' }`. Production should retry with exponential backoff and surface which categories are estimated vs. computed in the UI.
 
-**Caching** — Cache key is `sha256(url + first 500 chars of bodyText)`. A/B test variants that change the hero copy but not the URL will share a cache entry. A hash over the full extracted object would be more correct.
+**Caching** — Cache key is a SHA-256 over the canonical JSON of the full extracted object (url, headlines, ctas, valueProps, body). A/B test variants that change any of those fields get distinct cache entries. TTL is 10 minutes in `chrome.storage.local`; no cross-device sync, no eviction beyond TTL.
 
 **Cost controls** — Five concurrent Gemini calls per analysis. On a page with a 30-second session, a user could trigger many analyses. Rate limiting per tab + per hour in the SW would prevent accidental runaway spend.
 

@@ -1,5 +1,5 @@
 import { createLLM } from '../../llm'
-import { weightedOverall, severityRank } from '../../utils/scoring'
+import { weightedOverall, severityRank, WEIGHTS } from '../../utils/scoring'
 import type { AnalysisStateType } from '../state'
 import type { Issue, Category, AnalysisReport } from '../../types'
 
@@ -43,18 +43,10 @@ export async function aggregatorNode(
 
   const deduped = dedupeByOverlap(allIssues)
 
-  const weights: Record<Category, number> = {
-    value_prop: 0.3,
-    cta: 0.25,
-    readability: 0.2,
-    tone: 0.15,
-    jargon: 0.1,
-  }
-
   const sorted = deduped.sort((a, b) => {
     const severityDiff = severityRank(a.severity) - severityRank(b.severity)
     if (severityDiff !== 0) return severityDiff
-    return (weights[b.category] ?? 0) - (weights[a.category] ?? 0)
+    return (WEIGHTS[b.category] ?? 0) - (WEIGHTS[a.category] ?? 0)
   })
 
   const overallScore = weightedOverall(categoryScores)

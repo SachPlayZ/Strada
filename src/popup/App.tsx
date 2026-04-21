@@ -3,7 +3,7 @@ import { LoadingState } from './components/LoadingState'
 import { ErrorState } from './components/ErrorState'
 import { EmptyState } from './components/EmptyState'
 import { ReportView } from './components/ReportView'
-import type { AnalysisReport, ExtractedCopy } from '@/lib/types'
+import type { AnalysisReport, ExtractedCopy, BgMessage } from '@/lib/types'
 
 type AppState =
   | { status: 'idle' }
@@ -15,20 +15,19 @@ type AppState =
 export default function App() {
   const [state, setState] = useState<AppState>({ status: 'idle' })
 
-  const analyze = useCallback(() => {
-    setState({ status: 'loading' })
-
-    chrome.runtime.onMessage.addListener(function progressListener(msg) {
-      if (msg.type === 'PROGRESS') {
+  useEffect(() => {
+    const onProgress = (msg: BgMessage) => {
+      if (msg.type === 'PROGRESS')
         setState(prev =>
           prev.status === 'loading' ? { status: 'loading', stage: msg.stage } : prev,
         )
-        if (msg.stage === 'done') {
-          chrome.runtime.onMessage.removeListener(progressListener)
-        }
-      }
-    })
+    }
+    chrome.runtime.onMessage.addListener(onProgress)
+    return () => chrome.runtime.onMessage.removeListener(onProgress)
+  }, [])
 
+  const analyze = useCallback(() => {
+    setState({ status: 'loading' })
     chrome.runtime.sendMessage({ type: 'ANALYZE_PAGE' }, response => {
       if (chrome.runtime.lastError) {
         setState({

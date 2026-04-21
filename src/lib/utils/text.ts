@@ -1,5 +1,3 @@
-import type { Issue } from '../types'
-
 export function normalizeWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
@@ -35,14 +33,4 @@ export function fleschReadingEase(text: string): number {
   if (sentences.length === 0 || words.length === 0) return 0
 
   return 206.835 - 1.015 * (words.length / sentences.length) - 84.6 * (syllables / words.length)
-}
-
-export function dedupeIssues(issues: Issue[]): Issue[] {
-  const seen = new Set<string>()
-  return issues.filter(issue => {
-    const key = `${issue.category}|${issue.originalText.slice(0, 60)}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
 }

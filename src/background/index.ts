@@ -93,7 +93,15 @@ chrome.runtime.onMessage.addListener((message: BgMessage, _sender, sendResponse)
       return { ok: false, code: 'NO_COPY', message: 'No meaningful copy found on this page' }
     }
 
-    const cacheKey = await sha256(extracted.url + '|' + extracted.bodyText.slice(0, 500))
+    const cacheKey = await sha256(
+      JSON.stringify({
+        url: extracted.url,
+        headlines: extracted.headlines,
+        ctas: extracted.ctas,
+        valueProps: extracted.valueProps,
+        body: extracted.bodyText,
+      }),
+    )
     const cached = await getCached(cacheKey)
     if (cached) {
       sendProgress('done')

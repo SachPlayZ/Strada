@@ -1,6 +1,7 @@
 import { createLLM } from '../../llm'
 import { NodeResultSchema } from '../../schemas'
 import { fleschKincaidGrade, fleschReadingEase, truncateChars } from '../../utils/text'
+import { clamp } from '../../utils/scoring'
 import type { AnalysisStateType } from '../state'
 
 const FALLBACK = { issues: [], categoryScore: 50, rationale: 'unavailable' }
@@ -51,14 +52,14 @@ Based on the metrics AND the actual text, identify:
 
 Return a JSON with:
 - issues: specific readability problems (each with id, category="readability", severity, originalText quoting the problematic passage, problem, suggestion, optionally improvedText)
-- categoryScore: ${computedScore} (use this computed score, adjust ±5 based on qualitative assessment)
+- categoryScore: ${computedScore} (use this computed score, adjust ±10 based on qualitative assessment)
 - rationale: mention the FK grade level and what it means for the target audience`
 
     const result = await chain.invoke(prompt)
-    // Clamp score to computed ±5 range to prevent LLM from ignoring metrics
-    const clampedScore = Math.max(
+    const clampedScore = clamp(
+      result.categoryScore,
       Math.max(0, computedScore - 10),
-      Math.min(Math.min(100, computedScore + 10), result.categoryScore),
+      Math.min(100, computedScore + 10),
     )
     return { readability: { ...result, categoryScore: clampedScore } }
   } catch {
